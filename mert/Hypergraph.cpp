@@ -20,6 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include <boost/lexical_cast.hpp>
 
+#include "util/double-conversion/double-conversion.h"
 #include "util/string_piece.hh"
 #include "util/tokenize_piece.hh"
 
@@ -49,6 +50,8 @@ const Vocab::Entry &Vocab::FindOrAdd(const StringPiece &str) {
   return *map_.insert(Entry(copied, map_.size())).first;
 }
 
+double_conversion::StringToDoubleConverter converter(double_conversion::StringToDoubleConverter::NO_FLAGS, NAN, NAN, "inf", "nan");
+
 
 /**
  * Reads an incoming edge.
@@ -57,8 +60,7 @@ Edge* ReadEdge(util::FilePiece &from, Graph &graph) {
   Edge* edge = graph.NewEdge();
   StringPiece line = NextLine(from);
   util::TokenIter<util::MultiCharacter> pipes(line, util::MultiCharacter(" ||| "));
-  StringPiece target = *pipes;
-  for (util::TokenIter<util::SingleCharacter, false> i(target, util::SingleCharacter(' ')); i; ++i) {
+  for (util::TokenIter<util::SingleCharacter, false> i(*pipes, util::SingleCharacter(' ')); i; ++i) {
     StringPiece got = *i;
     if ('[' == *got.data() && ']' == got.data()[got.size() - 1]) {
       // non-terminal
@@ -73,10 +75,20 @@ Edge* ReadEdge(util::FilePiece &from, Graph &graph) {
       edge->AddWord(&found);
     }
   }
+ 
   ++pipes;
-  StringPiece featureString = *pipes;
-  cerr << featureString << endl;
-  //TODO: features
+  for (util::TokenIter<util::SingleCharacter, false> i(*pipes, util::SingleCharacter(' ')); i; ++i) {
+    StringPiece fv = *i;
+    if (!fv.size()) break;
+    size_t equals = fv.find_last_of("=");
+    UTIL_THROW_IF(equals == fv.npos, FormatException, "Failed to parse feature '" << fv << "'");
+    StringPiece name = fv.substr(0,equals);
+    StringPiece value = fv.substr(equals+1);
+    int processed;
+    float score = converter.StringToFloat(value.data(), value.length(), &processed);
+    UTIL_THROW_IF(isnan(score), FormatException, "Failed to parse weight '" << value << "'");
+    edge->AddFeature(name,score);
+  }
   return edge; 
 }
 

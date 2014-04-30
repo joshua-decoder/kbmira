@@ -31,6 +31,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include "util/pool.hh"
 #include "util/string_piece.hh"
 
+#include "FeatureStats.h"
 
 namespace MosesTuning {
 
@@ -116,17 +117,30 @@ class Edge {
       children_.push_back(child);
     }
 
+    void AddFeature(const StringPiece& name, FeatureStatsType value) {
+      //TODO StringPiece interface
+      features_.set(name.as_string(),value);
+    }
+
     typedef std::vector<const Vocab::Entry*> WordVec;
 
     const WordVec &Words() const {
       return words_;
+    }
+    
+    const SparseVector& Features() const {
+      return features_;
+    }
+
+    FeatureStatsType GetScore(const SparseVector& weights) {
+      return inner_product(features_, weights);
     }
 
   private:
     // NULL for non-terminals.  
     std::vector<const Vocab::Entry*> words_;
     std::vector<const Vertex*> children_;
-    //TODO:   feature::Vector features_;
+    SparseVector features_;
 };
 
 /*
@@ -160,6 +174,10 @@ class Graph : boost::noncopyable {
 
     Vertex &GetVertex(std::size_t index) {
       return vertices_[index];
+    }
+
+    Edge &GetEdge(std::size_t index) {
+      return edges_[index];
     }
 
     std::size_t VertexSize() const { return vertices_.Size(); }

@@ -41,6 +41,7 @@ int main(int argc, char** argv)
 {
   bool help;
   string current_hypergraphs = "./test_data/hypergraph";
+  string weights_file = "./test_data/weights";
 //  string current_hypergraphs = "/home/bhaddow/experiments/sparse-reordering/hg/hypergraph";
   //Think this is just for vocabulary.
   //string lm_file = "/fs/magni0/bhaddow/experiments/sparse-reordering/lm/project-syndicate.binlm.1";
@@ -50,7 +51,6 @@ int main(int argc, char** argv)
   ("help,h", po::value(&help)->zero_tokens()->default_value(false), "Print this help message and exit")
   ("current-hypergraphs", po::value<string>(&current_hypergraphs), "Directory containing hypergraphs")
   ;
-  cerr << "running" << endl;
 
   po::options_description cmdline_options;
   cmdline_options.add(desc);
@@ -74,5 +74,9 @@ int main(int argc, char** argv)
   Graph graph;
   ReadGraph(file, graph);
   
-
+  SparseVector weights;
+  weights.load(weights_file);
+  for (size_t i = 0; i < 10; ++i) {
+    cerr << graph.GetEdge(i).GetScore(weights) << endl;
+  }
 }
