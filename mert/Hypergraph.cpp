@@ -60,7 +60,7 @@ Edge* ReadEdge(util::FilePiece &from, Graph &graph) {
   Edge* edge = graph.NewEdge();
   StringPiece line = NextLine(from);
   util::TokenIter<util::MultiCharacter> pipes(line, util::MultiCharacter(" ||| "));
-  for (util::TokenIter<util::SingleCharacter, false> i(*pipes, util::SingleCharacter(' ')); i; ++i) {
+  for (util::TokenIter<util::SingleCharacter, true> i(*pipes, util::SingleCharacter(' ')); i; ++i) {
     StringPiece got = *i;
     if ('[' == *got.data() && ']' == got.data()[got.size() - 1]) {
       // non-terminal
@@ -69,7 +69,7 @@ Edge* ReadEdge(util::FilePiece &from, Graph &graph) {
       UTIL_THROW_IF(end_ptr != got.data() + got.size() - 1, FormatException, "Bad non-terminal" << got);
       UTIL_THROW_IF(child >= graph.VertexSize(), FormatException, "Reference to vertex " << child << " but we only have " << graph.VertexSize() << " vertices.  Is the file in bottom-up format?");
       edge->AddWord(NULL);
-      edge->AddChild(&graph.GetVertex(child));
+      edge->AddChild(child);
     } else {
       const Vocab::Entry &found = graph.MutableVocab().FindOrAdd(got);
       edge->AddWord(&found);
@@ -77,7 +77,7 @@ Edge* ReadEdge(util::FilePiece &from, Graph &graph) {
   }
  
   ++pipes;
-  for (util::TokenIter<util::SingleCharacter, false> i(*pipes, util::SingleCharacter(' ')); i; ++i) {
+  for (util::TokenIter<util::SingleCharacter, true> i(*pipes, util::SingleCharacter(' ')); i; ++i) {
     StringPiece fv = *i;
     if (!fv.size()) break;
     size_t equals = fv.find_last_of("=");

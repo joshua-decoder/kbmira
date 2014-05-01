@@ -1,4 +1,4 @@
-  /***********************************************************************
+/***********************************************************************
 Moses - factored phrase-based language decoder
 Copyright (C) 2014- University of Edinburgh
 
@@ -16,6 +16,9 @@ You should have received a copy of the GNU Lesser General Public
 License along with this library; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 ***********************************************************************/
+
+#ifndef HYPERGRAPH_H
+#define HYPERGRAPH_H
 
 #include <string>
 
@@ -102,6 +105,8 @@ class Vocab {
 
 };
 
+typedef std::vector<const Vocab::Entry*> WordVec;
+
 class Vertex;
 
 /**
@@ -113,7 +118,7 @@ class Edge {
       words_.push_back(word);
     }
 
-    void AddChild(const Vertex* child) {
+    void AddChild(size_t child) {
       children_.push_back(child);
     }
 
@@ -122,7 +127,6 @@ class Edge {
       features_.set(name.as_string(),value);
     }
 
-    typedef std::vector<const Vocab::Entry*> WordVec;
 
     const WordVec &Words() const {
       return words_;
@@ -132,14 +136,18 @@ class Edge {
       return features_;
     }
 
-    FeatureStatsType GetScore(const SparseVector& weights) {
+    const std::vector<size_t>& Children() const {
+      return children_;
+    }
+
+    FeatureStatsType GetScore(const SparseVector& weights) const {
       return inner_product(features_, weights);
     }
 
   private:
     // NULL for non-terminals.  
     std::vector<const Vocab::Entry*> words_;
-    std::vector<const Vertex*> children_;
+    std::vector<size_t> children_;
     SparseVector features_;
 };
 
@@ -149,6 +157,8 @@ class Edge {
 class Vertex {
   public:
     void AddEdge(const Edge* edge) {incoming_.push_back(edge);}
+
+    const std::vector<const Edge*>& GetIncoming() const {return incoming_;}
 
   private:
     std::vector<const Edge*> incoming_;
@@ -172,7 +182,7 @@ class Graph : boost::noncopyable {
       return vertices_.New();
     }
 
-    Vertex &GetVertex(std::size_t index) {
+    const Vertex &GetVertex(std::size_t index) const {
       return vertices_[index];
     }
 
@@ -199,3 +209,5 @@ void ReadGraph(util::FilePiece &from, Graph &graph);
 
 
 };
+
+#endif

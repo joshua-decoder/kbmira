@@ -30,6 +30,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <util/file_piece.hh>
 
 
+#include "ForestRescore.h"
 #include "Hypergraph.h"
 
 using namespace std;
@@ -76,7 +77,14 @@ int main(int argc, char** argv)
   
   SparseVector weights;
   weights.load(weights_file);
+  /*
   for (size_t i = 0; i < 10; ++i) {
     cerr << graph.GetEdge(i).GetScore(weights) << endl;
+  }*/
+  WordVec translation;
+  Viterbi(graph,weights,0,&translation);
+  for (size_t i = 0; i < translation.size(); ++i) {
+    cerr << translation[i]->first << " ";
   }
+  cerr << endl;
 }
