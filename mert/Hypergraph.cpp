@@ -54,12 +54,13 @@ double_conversion::StringToDoubleConverter converter(double_conversion::StringTo
 
 
 /**
- * Reads an incoming edge.
+ * Reads an incoming edge. Returns edge and source words covered.
 **/
-Edge* ReadEdge(util::FilePiece &from, Graph &graph) {
+static pair<Edge*,size_t> ReadEdge(util::FilePiece &from, Graph &graph) {
   Edge* edge = graph.NewEdge();
   StringPiece line = NextLine(from);
   util::TokenIter<util::MultiCharacter> pipes(line, util::MultiCharacter(" ||| "));
+  //Target
   for (util::TokenIter<util::SingleCharacter, true> i(*pipes, util::SingleCharacter(' ')); i; ++i) {
     StringPiece got = *i;
     if ('[' == *got.data() && ']' == got.data()[got.size() - 1]) {
@@ -76,6 +77,7 @@ Edge* ReadEdge(util::FilePiece &from, Graph &graph) {
     }
   }
  
+  //Features
   ++pipes;
   for (util::TokenIter<util::SingleCharacter, true> i(*pipes, util::SingleCharacter(' ')); i; ++i) {
     StringPiece fv = *i;
@@ -89,7 +91,10 @@ Edge* ReadEdge(util::FilePiece &from, Graph &graph) {
     UTIL_THROW_IF(isnan(score), FormatException, "Failed to parse weight '" << value << "'");
     edge->AddFeature(name,score);
   }
-  return edge; 
+  //Covered words
+  ++pipes;
+  size_t sourceCovered = boost::lexical_cast<size_t>(*pipes);
+  return pair<Edge*,size_t>(edge,sourceCovered); 
 }
 
 
@@ -100,7 +105,7 @@ void ReadGraph(util::FilePiece &from, Graph &graph) {
 
   //First line should contain field names
   StringPiece line = from.ReadLine();
-  UTIL_THROW_IF(line.compare("# target ||| features") != 0, FormatException, "Incorrect format spec on first line: '" << line << "'");
+  UTIL_THROW_IF(line.compare("# target ||| features ||| source-covered") != 0, FormatException, "Incorrect format spec on first line: '" << line << "'");
   line = NextLine(from);
   
   //Then expect numbers of vertices
@@ -115,7 +120,11 @@ void ReadGraph(util::FilePiece &from, Graph &graph) {
     unsigned long int edge_count = boost::lexical_cast<unsigned long int>(line);
     Vertex* vertex = graph.NewVertex();
     for (unsigned long int e = 0; e < edge_count; ++e) {
-      vertex->AddEdge(ReadEdge(from, graph));
+      pair<Edge*,size_t> edge = ReadEdge(from, graph);
+      vertex->AddEdge(edge.first);
+      //Note: the file format attaches this to the edge, but it's really a property 
+      //of the vertex.
+      if (!e) {vertex->SetSourceCovered(edge.second);}
     }
   }
 }
