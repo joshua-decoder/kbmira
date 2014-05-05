@@ -18,12 +18,80 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 ***********************************************************************/
 
 #include <limits>
+#include <list>
+
+#include <boost/unordered_set.hpp>
+
+#include "util/file_piece.hh"
+#include "util/tokenize_piece.hh"
 
 #include "ForestRescore.h"
 
 using namespace std;
 
 namespace MosesTuning {
+
+static const size_t kNgramOrder = 4;
+
+std::ostream& operator<<(std::ostream& out, const WordVec& wordVec) {
+  out << "[";
+  for (size_t i = 0; i < wordVec.size(); ++i) {
+    out << wordVec[i]->first;
+    if (i+1< wordVec.size()) out << " ";
+  }
+  out << "]";
+  return out;
+}
+
+void ReferenceSet::Load(vector<string>& files, Vocab& vocab) {
+  for (size_t i = 0; i < files.size(); ++i) {
+    util::FilePiece fh(files[i].c_str());
+    size_t sentenceId = 0;
+    while(true) {
+      StringPiece line;
+      try {
+        line = fh.ReadLine();
+      } catch (util::EndOfFileException &e) {
+        break;
+      }
+      //cerr << line << endl;
+      boost::unordered_multiset<WordVec, NgramHash, NgramEquals> ngramCounts;
+      list<WordVec> openNgrams;
+      //tokenize & count
+      for (util::TokenIter<util::SingleCharacter, true> j(line, util::SingleCharacter(' ')); j; ++j) {
+        const Vocab::Entry* nextTok = &(vocab.FindOrAdd(*j));
+        openNgrams.push_front(WordVec());
+        for (list<WordVec>::iterator k = openNgrams.begin(); k != openNgrams.end();  ++k) {
+          k->push_back(nextTok);
+          ngramCounts.insert(*k);
+        }
+        if (openNgrams.size() >=  kNgramOrder) openNgrams.pop_back();
+      }
+
+      //merge into overall ngram map
+      for (boost::unordered_multiset<WordVec>::const_iterator ni = ngramCounts.begin();
+        ni != ngramCounts.end(); ++ni) {
+        size_t count = ngramCounts.count(*ni);
+        //cerr << *ni << " " << count <<  endl;
+        if (ngramCounts_.size() <= sentenceId) ngramCounts_.resize(sentenceId+1);
+        NgramMap::iterator totalsIter = ngramCounts_[sentenceId].find(*ni);
+        if (totalsIter == ngramCounts_[sentenceId].end()) {
+          ngramCounts_[sentenceId][*ni] = pair<size_t,size_t>(count,count);
+        } else {
+          ngramCounts_[sentenceId][*ni].first = max(count, ngramCounts_[sentenceId][*ni].first); //clip
+          ngramCounts_[sentenceId][*ni].second += count; //no clip
+        }
+      }
+      //cerr << endl;
+      ++sentenceId;
+    }
+  }
+
+}
+  
+size_t ReferenceSet::NgramMatches(size_t sentenceId, const WordVec& ngram, bool clip) const  {
+  return 0;
+}
 
 static const FeatureStatsType kMinScore = -numeric_limits<FeatureStatsType>::max();
 typedef pair<const Edge*,FeatureStatsType> BackPointer;

@@ -19,14 +19,11 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include <iostream>
 #include <sstream>
+#include <vector>
 
 
 #include <boost/program_options.hpp>
 
-//#include <lm/model.hh>
-//#include <lm/vocab.hh>
-//#include <mert/hypergraph/graph.hh>
-//#include <mert/hypergraph/read.hh>
 #include <util/file_piece.hh>
 
 
@@ -43,6 +40,7 @@ int main(int argc, char** argv)
   bool help;
   string current_hypergraphs = "./test_data/hypergraph";
   string weights_file = "./test_data/weights";
+  vector<string> references;
 //  string current_hypergraphs = "/home/bhaddow/experiments/sparse-reordering/hg/hypergraph";
   //Think this is just for vocabulary.
   //string lm_file = "/fs/magni0/bhaddow/experiments/sparse-reordering/lm/project-syndicate.binlm.1";
@@ -51,6 +49,7 @@ int main(int argc, char** argv)
   desc.add_options()
   ("help,h", po::value(&help)->zero_tokens()->default_value(false), "Print this help message and exit")
   ("current-hypergraphs", po::value<string>(&current_hypergraphs), "Directory containing hypergraphs")
+  ("reference,r", po::value<vector<string> >(&references), "Reference file(s)")
   ;
 
   po::options_description cmdline_options;
@@ -68,12 +67,16 @@ int main(int argc, char** argv)
 //  lm::ngram::ProbingModel lm(lm_file.c_str());
   
   stringstream name;
-  name << current_hypergraphs << "/1.gz";
+  name << current_hypergraphs << "/5.gz";
+  references.push_back("./test_data/reference.tok");
   util::FilePiece file(name.str().c_str());
  // lm::ngram::SortedVocabulary vocab;
   
   Graph graph;
   ReadGraph(file, graph);
+
+  ReferenceSet referenceSet;
+  referenceSet.Load(references, graph.MutableVocab());
   
   SparseVector weights;
   weights.load(weights_file);
