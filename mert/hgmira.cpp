@@ -71,12 +71,20 @@ int main(int argc, char** argv)
   references.push_back("./test_data/reference.tok");
   util::FilePiece file(name.str().c_str());
  // lm::ngram::SortedVocabulary vocab;
+
   
   Graph graph;
   ReadGraph(file, graph);
 
   ReferenceSet referenceSet;
   referenceSet.Load(references, graph.MutableVocab());
+
+  
+  WordVec ngram;
+  ngram.push_back(&(graph.MutableVocab().FindOrAdd("the")));
+  cerr << referenceSet.NgramMatches(9,ngram,true) << endl;
+  ngram.push_back(&(graph.MutableVocab().FindOrAdd("1990")));
+  cerr << referenceSet.NgramMatches(9,ngram,true) << endl;
   
   SparseVector weights;
   weights.load(weights_file);

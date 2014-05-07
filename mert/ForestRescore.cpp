@@ -90,7 +90,10 @@ void ReferenceSet::Load(vector<string>& files, Vocab& vocab) {
 }
   
 size_t ReferenceSet::NgramMatches(size_t sentenceId, const WordVec& ngram, bool clip) const  {
-  return 0;
+  const NgramMap& ngramCounts = ngramCounts_.at(sentenceId);
+  NgramMap::const_iterator ngi = ngramCounts.find(ngram);
+  if (ngi == ngramCounts.end()) return 0;
+  return clip ? ngi->second.first : ngi->second.second;
 }
 
 static const FeatureStatsType kMinScore = -numeric_limits<FeatureStatsType>::max();
