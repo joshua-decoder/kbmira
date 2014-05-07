@@ -41,6 +41,7 @@ int main(int argc, char** argv)
   string current_hypergraphs = "./test_data/hypergraph";
   string weights_file = "./test_data/weights";
   vector<string> references;
+  float bleuWeight = 1;
 //  string current_hypergraphs = "/home/bhaddow/experiments/sparse-reordering/hg/hypergraph";
   //Think this is just for vocabulary.
   //string lm_file = "/fs/magni0/bhaddow/experiments/sparse-reordering/lm/project-syndicate.binlm.1";
@@ -50,6 +51,7 @@ int main(int argc, char** argv)
   ("help,h", po::value(&help)->zero_tokens()->default_value(false), "Print this help message and exit")
   ("current-hypergraphs", po::value<string>(&current_hypergraphs), "Directory containing hypergraphs")
   ("reference,r", po::value<vector<string> >(&references), "Reference file(s)")
+  ("bleu-weight,b", po::value<float>(&bleuWeight), "Bleu weight")
   ;
 
   po::options_description cmdline_options;
@@ -93,7 +95,7 @@ int main(int argc, char** argv)
     cerr << graph.GetEdge(i).GetScore(weights) << endl;
   }*/
   WordVec translation;
-  Viterbi(graph,weights,0,&translation);
+  Viterbi(graph,weights,bleuWeight,referenceSet,5,&translation);
   for (size_t i = 0; i < translation.size(); ++i) {
     cerr << translation[i]->first << " ";
   }
