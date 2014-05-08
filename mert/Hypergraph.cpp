@@ -27,6 +27,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include "Hypergraph.h"
 
 using namespace std;
+static const string kBOS = "<s>";
+static const string kEOS = "</s>";
 
 namespace MosesTuning {
 
@@ -34,6 +36,9 @@ StringPiece NextLine(util::FilePiece& from) {
   StringPiece line;
   while ((line = from.ReadLine()).starts_with("#"));
   return line;
+}
+
+Vocab::Vocab() :  eos_( FindOrAdd(kEOS)), bos_(FindOrAdd(kBOS)){
 }
 
 const Vocab::Entry &Vocab::FindOrAdd(const StringPiece &str) {
@@ -96,7 +101,6 @@ static pair<Edge*,size_t> ReadEdge(util::FilePiece &from, Graph &graph) {
   size_t sourceCovered = boost::lexical_cast<size_t>(*pipes);
   return pair<Edge*,size_t>(edge,sourceCovered); 
 }
-
 
 /**
   * Read from "Kenneth's hypergraph" aka cdec target_graph format (with comments)

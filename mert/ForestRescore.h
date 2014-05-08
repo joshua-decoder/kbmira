@@ -19,6 +19,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef MERT_FOREST_RESCORE_H
 #define MERT_FOREST_RESCORE_H
 
+#include <valarray>
 #include <vector>
 
 #include <boost/unordered_set.hpp>
@@ -73,9 +74,11 @@ private:
 };
 
 struct VertexState {
+  VertexState();
+
+  std::valarray<size_t> bleuStats;
   WordVec leftContext;
   WordVec rightContext;
-  NgramCounter counts;
   size_t targetLength;
 };
 
@@ -85,14 +88,14 @@ struct VertexState {
 class BleuScorer {
   public:
     BleuScorer(const ReferenceSet& references, const Graph& graph, size_t sentenceId):
-    references_(references), sentenceId_(sentenceId) {
+    references_(references), sentenceId_(sentenceId), graph_(graph) {
       vertexStates_.resize(graph.VertexSize());
       totalSourceLength_ = graph.GetVertex(graph.VertexSize()-1).SourceCovered();
     }
 
-    FeatureStatsType Score(const Edge& edge, const Vertex& head, NgramCounter& ngramCounts) const;
+    FeatureStatsType Score(const Edge& edge, const Vertex& head, std::valarray<size_t>& bleuStats) const;
 
-    void UpdateState(const Edge& winnerEdge, size_t vertexId, NgramCounter& ngramCounts);
+    void UpdateState(const Edge& winnerEdge, size_t vertexId, const std::valarray<size_t>& bleuStats);
 
 
   private:
@@ -100,8 +103,9 @@ class BleuScorer {
     std::vector<VertexState> vertexStates_;
     size_t sentenceId_;
     size_t totalSourceLength_;
-    void UpdateMatches(const NgramCounter& counter, 
-      std::vector<FeatureStatsType>& totals, std::vector<FeatureStatsType>& matches) const;
+    const Graph& graph_;
+
+    void UpdateMatches(const NgramCounter& counter, std::valarray<size_t>& bleuStats) const;
     size_t GetTargetLength(const Edge& edge) const;
 };
 

@@ -81,9 +81,15 @@ template <class T> class FixedAllocator : boost::noncopyable {
 
 class Vocab {
   public:
+    Vocab();
+
     typedef std::pair<const char *const, WordIndex> Entry;
 
     const Entry &FindOrAdd(const StringPiece &str);
+
+    const Entry& Bos() const {return bos_;}
+
+    const Entry& Eos() const {return eos_;}
 
   private:
     util::Pool piece_backing_;
@@ -102,6 +108,8 @@ class Vocab {
 
     typedef boost::unordered_map<const char *, WordIndex, Hash, Equals> Map;
     Map map_;
+    Entry eos_;
+    Entry bos_;
 
 };
 
@@ -174,6 +182,7 @@ class Vertex {
 
 class Graph : boost::noncopyable {
   public:
+
     void SetCounts(std::size_t vertices, std::size_t edges) {
       vertices_.Init(vertices);
       edges_.Init(edges);
@@ -198,6 +207,10 @@ class Graph : boost::noncopyable {
     }
 
     std::size_t VertexSize() const { return vertices_.Size(); }
+
+    bool IsBoundary(const Vocab::Entry* word) const {
+      return word->second == vocab_.Bos().second || word->second == vocab_.Eos().second;
+    }
 
   private:
     FixedAllocator<Edge> edges_;    

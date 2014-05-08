@@ -107,14 +107,15 @@ size_t ReferenceSet::NgramMatches(size_t sentenceId, const WordVec& ngram, bool 
   return clip ? ngi->second.first : ngi->second.second;
 }
 
-void BleuScorer::UpdateMatches(const NgramCounter& counts, 
-  vector<FeatureStatsType>& totals, vector<FeatureStatsType>& matches) const {
+VertexState::VertexState(): bleuStats(kNgramOrder) {}
+
+void BleuScorer::UpdateMatches(const NgramCounter& counts, valarray<size_t>& bleuStats ) const {
   for (NgramCounter::const_iterator ngi = counts.begin(); ngi != counts.end(); ++ngi) {
-    cerr << "Checking: " << *ngi << endl;
+    //cerr << "Checking: " << *ngi << " matches " << references_.NgramMatches(sentenceId_,*ngi,false) <<  endl;
     size_t order = ngi->size();
     size_t count = counts.count(*ngi);
-    totals[order-1] += count;
-    matches[order-1] += min(count, references_.NgramMatches(sentenceId_,*ngi,false));
+    bleuStats[(order-1)*2 + 1] += count;
+    bleuStats[(order-1) * 2] += min(count, references_.NgramMatches(sentenceId_,*ngi,false));
   }
 }
 
@@ -131,7 +132,8 @@ size_t BleuScorer::GetTargetLength(const Edge& edge) const {
   return targetLength;
 }
 
-FeatureStatsType BleuScorer::Score(const Edge& edge, const Vertex& head, NgramCounter& ngramCounts) const {
+FeatureStatsType BleuScorer::Score(const Edge& edge, const Vertex& head, valarray<size_t>& bleuStats) const {
+  NgramCounter ngramCounts;
   size_t childId = 0;
   size_t wordId = 0;
   size_t contextId = 0; //position within left or right context
@@ -190,6 +192,7 @@ FeatureStatsType BleuScorer::Score(const Edge& edge, const Vertex& head, NgramCo
       }
     }
     assert(currentWord);
+    if (graph_.IsBoundary(currentWord)) continue;
     openNgrams.push_front(WordVec());
     for (list<WordVec>::iterator k = openNgrams.begin(); k != openNgrams.end();  ++k) {
       k->push_back(currentWord);
@@ -200,26 +203,24 @@ FeatureStatsType BleuScorer::Score(const Edge& edge, const Vertex& head, NgramCo
   }
   
   //Collect matches
-  vector<FeatureStatsType> totals(kNgramOrder);
-  vector<FeatureStatsType> matches(kNgramOrder);
   //This edge
-  cerr << "edge ngrams" << endl;
-  UpdateMatches(ngramCounts, totals, matches);
+  //cerr << "edge ngrams" << endl;
+  UpdateMatches(ngramCounts, bleuStats);
   //Child vertexes
   for (size_t i = 0; i < edge.Children().size(); ++i) {
-    cerr << "vertex ngrams " << edge.Children()[i] << endl;
-    UpdateMatches(vertexStates_[edge.Children()[i]].counts, totals, matches);
+    //cerr << "vertex ngrams " << edge.Children()[i] << endl;
+    bleuStats += vertexStates_[edge.Children()[i]].bleuStats;
   }
 
   //TODO: Add background - for now just do 0.01 smoothing
   FeatureStatsType logbleu = 0.0;
   static FeatureStatsType kSmooth = 0.01;
-  for (size_t i = 0; i < totals.size(); ++i) {
-    cerr << "match: " << matches[i] << " total: " << totals[i] << " ";
-    logbleu += log(matches[i] + kSmooth);
-    logbleu -= log(totals[i] + kSmooth);
+  for (size_t i = 0; i < bleuStats.size(); i+=2) {
+    //cerr << "match: " << bleuStats[i] << " total: " << bleuStats[i+1] << " ";
+    logbleu += log(bleuStats[i] + kSmooth);
+    logbleu -= log(bleuStats[i+1] + kSmooth);
   }
-  cerr << endl;
+  //cerr << endl;
 
   logbleu /= kNgramOrder;
 
@@ -230,17 +231,17 @@ FeatureStatsType BleuScorer::Score(const Edge& edge, const Vertex& head, NgramCo
     sourceLength / totalSourceLength_ * referenceLength;
   FeatureStatsType targetLength = GetTargetLength(edge);
   FeatureStatsType bp = effectiveReferenceLength / targetLength;
-  cerr << "bleu before bp " << exp(logbleu) << endl;
+  //cerr << "bleu before bp " << exp(logbleu) << endl;
   if (bp > 1) {
     logbleu += 1-bp;
   }
-  cerr << "bleu after bp " << exp(logbleu) << endl;
+  //cerr << "bleu after bp " << exp(logbleu) << endl;
 
   FeatureStatsType bleu = exp(logbleu);
   return bleu;
 }
 
-void BleuScorer::UpdateState(const Edge& winnerEdge, size_t vertexId, NgramCounter& ngramCounts) {
+void BleuScorer::UpdateState(const Edge& winnerEdge, size_t vertexId, const valarray<size_t>& bleuStats) {
   //TODO: Maybe more efficient to absorb into the Score() method
   VertexState& vertexState = vertexStates_[vertexId];
   
@@ -300,7 +301,7 @@ void BleuScorer::UpdateState(const Edge& winnerEdge, size_t vertexId, NgramCount
 
   //length + counts
   vertexState.targetLength = GetTargetLength(winnerEdge);
-  vertexState.counts = ngramCounts;
+  vertexState.bleuStats = bleuStats;
 }
 
 
@@ -333,15 +334,15 @@ void Viterbi(const Graph& graph, const SparseVector& weights, float bleuWeight, 
   vector<BackPointer> backPointers(graph.VertexSize(),init);
   BleuScorer bleuScorer(references, graph, sentenceId);
   for (size_t vi = 0; vi < graph.VertexSize(); ++vi) {
-    cerr << "vertex id " << vi <<  endl;
+    //cerr << "vertex id " << vi <<  endl;
     const Vertex& vertex = graph.GetVertex(vi);
     const vector<const Edge*>& incoming = vertex.GetIncoming();
     if (!incoming.size()) {
       backPointers[vi].second = 0;  
     } else {
-      NgramCounter winnerCounts;
+      valarray<size_t> winnerStats(kNgramOrder*2);
       for (size_t ei = 0; ei < incoming.size(); ++ei) {
-        cerr << "edge id " << ei << endl;
+        //cerr << "edge id " << ei << endl;
         FeatureStatsType incomingScore = incoming[ei]->GetScore(weights);
         for (size_t i = 0; i < incoming[ei]->Children().size(); ++i) {
           size_t childId = incoming[ei]->Children()[i];
@@ -349,21 +350,21 @@ void Viterbi(const Graph& graph, const SparseVector& weights, float bleuWeight, 
             FormatException, "Graph was not topologically sorted. curr=" << vi << " prev=" << childId);
           incomingScore += backPointers[childId].second;
         }
-        NgramCounter ngramCounts;
+        valarray<size_t> bleuStats(kNgramOrder*2);
         if (bleuWeight) {
-          FeatureStatsType bleuScore = bleuScorer.Score(*(incoming[ei]), vertex, ngramCounts);
+          FeatureStatsType bleuScore = bleuScorer.Score(*(incoming[ei]), vertex, bleuStats);
           incomingScore += bleuWeight * bleuScore;
-          cerr << "is " << incomingScore << " bs " << bleuScore << endl;
+          //cerr << "is " << incomingScore << " bs " << bleuScore << endl;
         }
         if (incomingScore >= backPointers[vi].second) {
           backPointers[vi].first = incoming[ei];
           backPointers[vi].second = incomingScore;
-          winnerCounts = ngramCounts;
+          winnerStats = bleuStats;
         }
       }
       //update with winner
       if (bleuWeight) {
-        bleuScorer.UpdateState(*(backPointers[vi].first), vi, winnerCounts);
+        bleuScorer.UpdateState(*(backPointers[vi].first), vi, winnerStats);
       }
     }
   }
