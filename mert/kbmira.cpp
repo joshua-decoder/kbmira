@@ -39,7 +39,10 @@ de recherches du Canada
 #include <boost/program_options.hpp>
 #include <boost/scoped_ptr.hpp>
 
+#include "util/exception.hh"
+
 #include "BleuScorer.h"
+#include "HopeFearDecoder.h"
 #include "HypPackEnumerator.h"
 #include "MiraFeatureVector.h"
 #include "MiraWeightVector.h"
@@ -79,6 +82,7 @@ int main(int argc, char** argv)
   bool help;
   string denseInitFile;
   string sparseInitFile;
+  string type = "nbest";
   vector<string> scoreFiles;
   vector<string> featureFiles;
   int seed;
@@ -96,6 +100,7 @@ int main(int argc, char** argv)
   po::options_description desc("Allowed options");
   desc.add_options()
   ("help,h", po::value(&help)->zero_tokens()->default_value(false), "Print this help message and exit")
+  ("type,t", po::value<string>(&type), "Either nbest or lattice")
   ("scfile,S", po::value<vector<string> >(&scoreFiles), "Scorer data files")
   ("ffile,F", po::value<vector<string> > (&featureFiles), "Feature data files")
   ("random-seed,r", po::value<int>(&seed), "Seed for random number generation")
@@ -187,6 +192,15 @@ int main(int argc, char** argv)
     bg.push_back(kBleuNgramOrder-j);
   }
   bg.push_back(kBleuNgramOrder);
+
+  boost::scoped_ptr<HopeFearDecoder> decoder;
+  if (type == "nbest") {
+    decoder.reset(new NbestHopeFearDecoder(featureFiles, scoreFiles, streaming, no_shuffle));
+  } else if (type == "lattice") {
+    //initialise lattice decoder
+  } else {
+    UTIL_THROW(util::Exception, "Unknown batch mira type: '" << type << "'");
+  }
 
   // Training loop
   boost::scoped_ptr<HypPackEnumerator> train;
