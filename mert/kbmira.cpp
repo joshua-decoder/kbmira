@@ -195,7 +195,7 @@ int main(int argc, char** argv)
 
   boost::scoped_ptr<HopeFearDecoder> decoder;
   if (type == "nbest") {
-    decoder.reset(new NbestHopeFearDecoder(featureFiles, scoreFiles, streaming, no_shuffle));
+    decoder.reset(new NbestHopeFearDecoder(featureFiles, scoreFiles, streaming, no_shuffle, safe_hope));
   } else if (type == "lattice") {
     //initialise lattice decoder
   } else {

@@ -25,6 +25,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "HypPackEnumerator.h"
 #include "MiraFeatureVector.h"
+#include "MiraWeightVector.h"
 
 //
 // Used by batch mira to get the hope, fear and model hypothesis. This wraps
@@ -44,11 +45,16 @@ public:
     * Accepts equal length vectors of model and bleu weights, returns the hypothoses maximimising
     * modelScore*modelWeights[i] + bleu*bleuWeights[i] for each i
     **/
-  virtual void HopeFear(const std::vector<ValType> modelWeights,
-                const std::vector<ValType> bleuWeights,
-                const std::vector<ValType> backgroundBleu,
-                std::vector<MiraFeatureVector>* featureVectors,
-                std::vector<ValType>* bleus) = 0;
+  virtual void HopeFear(
+              const std::vector<ValType> backgroundBleu,
+              const MiraWeightVector& wv,
+              const MiraFeatureVector* modelFeatures,
+              const MiraFeatureVector* hopeFeatures,
+              const MiraFeatureVector* fearFeatures,
+              std::vector<float>* modelBleuStats,
+              ValType* hopeBleu,
+              ValType* fearBleu
+              ) = 0;
 
 
 };
@@ -59,19 +65,27 @@ public:
   NbestHopeFearDecoder(const std::vector<std::string>& featureFiles,
                          const std::vector<std::string>&  scoreFiles,
                          bool streaming,
-                         bool  no_shuffle);  
+                         bool  no_shuffle,
+                         bool safe_hope
+                         );
 
   virtual void next();
   virtual bool finished();
 
-  virtual void HopeFear(const std::vector<ValType> modelWeights,
-                const std::vector<ValType> bleuWeights,
-                const std::vector<ValType> backgroundBleu,
-                std::vector<MiraFeatureVector>* featureVectors,
-                std::vector<ValType>* bleus);
+  virtual void HopeFear(
+              const std::vector<ValType> backgroundBleu,
+              const MiraWeightVector& wv,
+              const MiraFeatureVector* modelFeatures,
+              const MiraFeatureVector* hopeFeatures,
+              const MiraFeatureVector* fearFeatures,
+              std::vector<float>* modelBleuStats,
+              ValType* hopeBleu,
+              ValType* fearBleu
+              );
 
 private:
   boost::scoped_ptr<HypPackEnumerator> train_;
+  bool safe_hope_;
 
 };
 

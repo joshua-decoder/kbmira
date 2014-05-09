@@ -104,7 +104,6 @@ private:
 };
 
 
-#endif // MERT_WEIGHT_VECTOR_H
 
 // --Emacs trickery--
 // Local Variables:
@@ -113,3 +112,4 @@ private:
 // End:
 
 }
+#endif // MERT_WEIGHT_VECTOR_H
