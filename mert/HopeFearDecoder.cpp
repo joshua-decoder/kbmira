@@ -40,7 +40,6 @@ NbestHopeFearDecoder::NbestHopeFearDecoder(
   } else {
     train_.reset(new RandomAccessHypPackEnumerator(featureFiles, scoreFiles, no_shuffle));
   }
-  train_->reset();
 }
 
 
@@ -52,15 +51,21 @@ bool NbestHopeFearDecoder::finished() {
   return train_->finished();
 }
 
+void NbestHopeFearDecoder::reset() {
+  train_->reset();
+}
+
 void NbestHopeFearDecoder::HopeFear(
               const std::vector<ValType> backgroundBleu,
               const MiraWeightVector& wv,
-              const MiraFeatureVector* modelFeatures,
-              const MiraFeatureVector* hopeFeatures,
-              const MiraFeatureVector* fearFeatures,
+              MiraFeatureVector* modelFeatures,
+              MiraFeatureVector* hopeFeatures,
+              MiraFeatureVector* fearFeatures,
               vector<float>* modelBleuStats,
+              vector<float>* hopeBleuStats,
               ValType* hopeBleu,
-              ValType* fearBleu
+              ValType* fearBleu,
+              bool* hopeFearEqual
               ) {
 
   
@@ -99,16 +104,17 @@ void NbestHopeFearDecoder::HopeFear(
       hope_scale = abs(hope_bleu) / abs(hope_model);
     else break;
   }
-  modelFeatures = &(train_->featuresAt(model_index));
-  hopeFeatures = &(train_->featuresAt(hope_index));
-  fearFeatures = &(train_->featuresAt(fear_index));
+  *modelFeatures = train_->featuresAt(model_index);
+  *hopeFeatures = train_->featuresAt(hope_index);
+  *fearFeatures = train_->featuresAt(fear_index);
 
-  const vector<float>& hope_stats = train_->scoresAt(hope_index);
-  *hopeBleu = sentenceLevelBackgroundBleu(hope_stats, backgroundBleu);
+  *hopeBleuStats = train_->scoresAt(hope_index);
+  *hopeBleu = sentenceLevelBackgroundBleu(*hopeBleuStats, backgroundBleu);
   const vector<float>& fear_stats = train_->scoresAt(fear_index);
   *fearBleu = sentenceLevelBackgroundBleu(fear_stats, backgroundBleu);
 
   *modelBleuStats = train_->scoresAt(model_index);
+  *hopeFearEqual = (hope_index == fear_index);
 }
 
 

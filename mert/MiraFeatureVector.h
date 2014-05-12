@@ -26,6 +26,7 @@ typedef FeatureStatsType ValType;
 class MiraFeatureVector
 {
 public:
+  MiraFeatureVector() {}
   MiraFeatureVector(const FeatureDataItem& vec);
   MiraFeatureVector(const MiraFeatureVector& other);
   MiraFeatureVector(const std::vector<ValType>& dense,

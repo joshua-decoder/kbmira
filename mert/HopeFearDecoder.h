@@ -38,6 +38,7 @@ namespace MosesTuning {
 class HopeFearDecoder {
 public:
   //iterator methods
+  virtual void reset() = 0;
   virtual void next() = 0;
   virtual bool finished() = 0;
 
@@ -48,12 +49,14 @@ public:
   virtual void HopeFear(
               const std::vector<ValType> backgroundBleu,
               const MiraWeightVector& wv,
-              const MiraFeatureVector* modelFeatures,
-              const MiraFeatureVector* hopeFeatures,
-              const MiraFeatureVector* fearFeatures,
+              MiraFeatureVector* modelFeatures,
+              MiraFeatureVector* hopeFeatures,
+              MiraFeatureVector* fearFeatures,
               std::vector<float>* modelBleuStats,
+              std::vector<float>* hopeBleuStats,
               ValType* hopeBleu,
-              ValType* fearBleu
+              ValType* fearBleu,
+              bool* hopeFearEqual
               ) = 0;
 
 
@@ -69,18 +72,21 @@ public:
                          bool safe_hope
                          );
 
+  virtual void reset();
   virtual void next();
   virtual bool finished();
 
   virtual void HopeFear(
               const std::vector<ValType> backgroundBleu,
               const MiraWeightVector& wv,
-              const MiraFeatureVector* modelFeatures,
-              const MiraFeatureVector* hopeFeatures,
-              const MiraFeatureVector* fearFeatures,
+              MiraFeatureVector* modelFeatures,
+              MiraFeatureVector* hopeFeatures,
+              MiraFeatureVector* fearFeatures,
               std::vector<float>* modelBleuStats,
+              std::vector<float>* hopeBleuStats,
               ValType* hopeBleu,
-              ValType* fearBleu
+              ValType* fearBleu,
+              bool* hopeFearEqual
               );
 
 private:

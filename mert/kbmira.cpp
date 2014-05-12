@@ -78,7 +78,6 @@ ValType evaluate(HypPackEnumerator* train, const AvgWeightVector& wv)
 
 int main(int argc, char** argv)
 {
-  const ValType BLEU_RATIO = 5;
   bool help;
   string denseInitFile;
   string sparseInitFile;
@@ -212,72 +211,34 @@ int main(int argc, char** argv)
   ValType bestBleu = 0;
   for(int j=0; j<n_iters; j++) {
     // MIRA train for one epoch
-    int iNumHyps = 0;
     int iNumExamples = 0;
     int iNumUpdates = 0;
     ValType totalLoss = 0.0;
-    for(train->reset(); !train->finished(); train->next()) {
-      // Hope / fear decode
-      ValType hope_scale = 1.0;
-      size_t hope_index=0, fear_index=0, model_index=0;
-      ValType hope_score=0, fear_score=0, model_score=0;
-      int iNumHypsBackup = iNumHyps;
-      for(size_t safe_loop=0; safe_loop<2; safe_loop++) {
-        iNumHyps = iNumHypsBackup;
-        ValType hope_bleu, hope_model;
-        for(size_t i=0; i< train->cur_size(); i++) {
-          const MiraFeatureVector& vec=train->featuresAt(i);
-          ValType score = wv.score(vec);
-          ValType bleu = sentenceLevelBackgroundBleu(train->scoresAt(i),bg);
-          // Hope
-          if(i==0 || (hope_scale*score + bleu) > hope_score) {
-            hope_score = hope_scale*score + bleu;
-            hope_index = i;
-            hope_bleu = bleu;
-            hope_model = score;
-          }
-          // Fear
-          if(i==0 || (score - bleu) > fear_score) {
-            fear_score = score - bleu;
-            fear_index = i;
-          }
-          // Model
-          if(i==0 || score > model_score) {
-            model_score = score;
-            model_index = i;
-          }
-          iNumHyps++;
-        }
-        // Outer loop rescales the contribution of model score to 'hope' in antagonistic cases
-        // where model score is having far more influence than BLEU
-        hope_bleu *= BLEU_RATIO; // We only care about cases where model has MUCH more influence than BLEU
-        if(safe_hope && safe_loop==0 && abs(hope_model)>1e-8 && abs(hope_bleu)/abs(hope_model)<hope_scale)
-          hope_scale = abs(hope_bleu) / abs(hope_model);
-        else break;
-      }
+    size_t sentenceIndex = 0;
+    for(decoder->reset();!decoder->finished(); decoder->next()) {
+      MiraFeatureVector hope,fear,model;
+      ValType hopeBleu,fearBleu;
+      vector<float> model_stats,hope_stats;
+      bool hopeFearEqual;
+      decoder->HopeFear(bg,wv,&model,&hope,&fear,&model_stats,&hope_stats,&hopeBleu,&fearBleu,&hopeFearEqual);
+    
       // Update weights
-      if(hope_index!=fear_index) {
+      if(!hopeFearEqual) { 
         // Vector difference
-        const MiraFeatureVector& hope=train->featuresAt(hope_index);
-        const MiraFeatureVector& fear=train->featuresAt(fear_index);
         MiraFeatureVector diff = hope - fear;
         // Bleu difference
-        const vector<float>& hope_stats = train->scoresAt(hope_index);
-        ValType hopeBleu = sentenceLevelBackgroundBleu(hope_stats, bg);
-        const vector<float>& fear_stats = train->scoresAt(fear_index);
-        ValType fearBleu = sentenceLevelBackgroundBleu(fear_stats, bg);
         assert(hopeBleu + 1e-8 >= fearBleu);
         ValType delta = hopeBleu - fearBleu;
         // Loss and update
         ValType diff_score = wv.score(diff);
         ValType loss = delta - diff_score;
         if(verbose) {
-          cerr << "Updating sent " << train->cur_id() << endl;
+          cerr << "Updating sent " << sentenceIndex << endl;
           cerr << "Wght: " << wv << endl;
           cerr << "Hope: " << hope << " BLEU:" << hopeBleu << " Score:" << wv.score(hope) << endl;
           cerr << "Fear: " << fear << " BLEU:" << fearBleu << " Score:" << wv.score(fear) << endl;
           cerr << "Diff: " << diff << " BLEU:" << delta << " Score:" << diff_score << endl;
-          cerr << "Loss: " << loss << " Scale: " << hope_scale << endl;
+          cerr << "Loss: " << loss << endl; //" Scale: " << hope_scale << endl;
           cerr << endl;
         }
         if(loss > 0) {
@@ -287,7 +248,6 @@ int main(int argc, char** argv)
           iNumUpdates++;
         }
         // Update BLEU statistics
-        const vector<float>& model_stats = train->scoresAt(model_index);
         for(size_t k=0; k<bg.size(); k++) {
           bg[k]*=decay;
           if(model_bg)
@@ -297,6 +257,7 @@ int main(int argc, char** argv)
         }
       }
       iNumExamples++;
+      ++sentenceIndex;
     }
     // Training Epoch summary
     cerr << iNumUpdates << "/" << iNumExamples << " updates"
