@@ -72,8 +72,8 @@ static pair<Edge*,size_t> ReadEdge(util::FilePiece &from, Graph &graph) {
       // non-terminal
       char *end_ptr;
       unsigned long int child = std::strtoul(got.data() + 1, &end_ptr, 10);
-      UTIL_THROW_IF(end_ptr != got.data() + got.size() - 1, FormatException, "Bad non-terminal" << got);
-      UTIL_THROW_IF(child >= graph.VertexSize(), FormatException, "Reference to vertex " << child << " but we only have " << graph.VertexSize() << " vertices.  Is the file in bottom-up format?");
+      UTIL_THROW_IF(end_ptr != got.data() + got.size() - 1, HypergraphException, "Bad non-terminal" << got);
+      UTIL_THROW_IF(child >= graph.VertexSize(), HypergraphException, "Reference to vertex " << child << " but we only have " << graph.VertexSize() << " vertices.  Is the file in bottom-up format?");
       edge->AddWord(NULL);
       edge->AddChild(child);
     } else {
@@ -88,12 +88,12 @@ static pair<Edge*,size_t> ReadEdge(util::FilePiece &from, Graph &graph) {
     StringPiece fv = *i;
     if (!fv.size()) break;
     size_t equals = fv.find_last_of("=");
-    UTIL_THROW_IF(equals == fv.npos, FormatException, "Failed to parse feature '" << fv << "'");
+    UTIL_THROW_IF(equals == fv.npos, HypergraphException, "Failed to parse feature '" << fv << "'");
     StringPiece name = fv.substr(0,equals);
     StringPiece value = fv.substr(equals+1);
     int processed;
     float score = converter.StringToFloat(value.data(), value.length(), &processed);
-    UTIL_THROW_IF(isnan(score), FormatException, "Failed to parse weight '" << value << "'");
+    UTIL_THROW_IF(isnan(score), HypergraphException, "Failed to parse weight '" << value << "'");
     edge->AddFeature(name,score);
   }
   //Covered words
@@ -109,7 +109,7 @@ void ReadGraph(util::FilePiece &from, Graph &graph) {
 
   //First line should contain field names
   StringPiece line = from.ReadLine();
-  UTIL_THROW_IF(line.compare("# target ||| features ||| source-covered") != 0, FormatException, "Incorrect format spec on first line: '" << line << "'");
+  UTIL_THROW_IF(line.compare("# target ||| features ||| source-covered") != 0, HypergraphException, "Incorrect format spec on first line: '" << line << "'");
   line = NextLine(from);
   
   //Then expect numbers of vertices

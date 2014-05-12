@@ -22,7 +22,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <vector>
 
 #include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
 
+#include "ForestRescore.h"
+#include "Hypergraph.h"
 #include "HypPackEnumerator.h"
 #include "MiraFeatureVector.h"
 #include "MiraWeightVector.h"
@@ -76,6 +79,7 @@ public:
 };
 
 
+/** Gets hope-fear from nbest lists */
 class NbestHopeFearDecoder : public virtual HopeFearDecoder {
 public:
   NbestHopeFearDecoder(const std::vector<std::string>& featureFiles,
@@ -100,6 +104,37 @@ public:
 private:
   boost::scoped_ptr<HypPackEnumerator> train_;
   bool safe_hope_;
+
+};
+
+
+
+/** Gets hope-fear from hypergraphs */
+class HypergraphHopeFearDecoder : public virtual HopeFearDecoder {
+public:
+  HypergraphHopeFearDecoder(
+                            const std::string& hypergraphDir,
+                            bool streaming,
+                            bool no_shuffle,
+                            bool safe_hope
+                            );
+
+  virtual void reset();
+  virtual void next();
+  virtual bool finished();
+
+  virtual void HopeFear(
+              const std::vector<ValType> backgroundBleu,
+              const MiraWeightVector& wv,
+              HopeFearData* hopeFear
+              );
+
+  virtual void MaxModel(const AvgWeightVector& wv, std::vector<ValType>* stats);
+
+private:
+  typedef std::vector<boost::shared_ptr<Graph> > GraphVec;
+  GraphVec graphs_;
+  GraphVec::const_iterator graphIter_;
 
 };
 

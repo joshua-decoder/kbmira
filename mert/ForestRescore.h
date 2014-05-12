@@ -85,9 +85,9 @@ struct VertexState {
 /**
   * Used to score an rule (ie edge) when we are applying it.
 **/
-class BleuScorer {
+class HgBleuScorer {
   public:
-    BleuScorer(const ReferenceSet& references, const Graph& graph, size_t sentenceId):
+    HgBleuScorer(const ReferenceSet& references, const Graph& graph, size_t sentenceId):
     references_(references), sentenceId_(sentenceId), graph_(graph) {
       vertexStates_.resize(graph.VertexSize());
       totalSourceLength_ = graph.GetVertex(graph.VertexSize()-1).SourceCovered();

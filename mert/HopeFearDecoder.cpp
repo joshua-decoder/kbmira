@@ -19,10 +19,16 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include <cmath>
 
+#include <boost/filesystem.hpp>
+
+#include "util/exception.hh"
+#include "util/file_piece.hh"
+
 #include "BleuScorer.h"
 #include "HopeFearDecoder.h"
 
 using namespace std;
+namespace fs = boost::filesystem;
 
 namespace MosesTuning {
 
@@ -136,6 +142,54 @@ void NbestHopeFearDecoder::MaxModel(const AvgWeightVector& wv, std::vector<ValTy
   }
   *stats = train_->scoresAt(max_index);
 }
+
+
+
+HypergraphHopeFearDecoder::HypergraphHopeFearDecoder
+                          (
+                            const string& hypergraphDir,
+                            bool streaming,
+                            bool no_shuffle,
+                            bool safe_hope
+                          ) {
+
+  UTIL_THROW_IF(streaming, util::Exception, "Streaming not currently supported for hypergraphs");
+  UTIL_THROW_IF(!fs::exists(hypergraphDir), HypergraphException, "Directory '" << hypergraphDir << "' does not exist");
+  static const string kWeights = "weights";
+  fs::directory_iterator dend;
+  for (fs::directory_iterator di(hypergraphDir); di != dend; ++di) {
+    boost::shared_ptr<Graph> graph;
+    graph.reset(new Graph());
+    if (di->path().filename() == kWeights) continue;
+    util::FilePiece file(di->path().string().c_str());
+    ReadGraph(file,*graph);
+    graphs_.push_back(graph);
+  }
+}
+
+void HypergraphHopeFearDecoder::reset() {
+  graphIter_ = graphs_.begin();
+}
+
+void HypergraphHopeFearDecoder::next() {
+  ++graphIter_;
+}
+
+bool HypergraphHopeFearDecoder::finished() {
+  return graphIter_ == graphs_.end();
+}
+
+void HypergraphHopeFearDecoder::HopeFear(
+            const vector<ValType> backgroundBleu,
+            const MiraWeightVector& wv,
+            HopeFearData* hopeFear
+            ) {
+}
+
+void HypergraphHopeFearDecoder::MaxModel(const AvgWeightVector& wv, vector<ValType>* stats) {
+
+}
+
 
 
 };

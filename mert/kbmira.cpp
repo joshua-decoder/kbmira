@@ -59,6 +59,7 @@ int main(int argc, char** argv)
   string type = "nbest";
   vector<string> scoreFiles;
   vector<string> featureFiles;
+  string hgDir;
   int seed;
   string outputFile;
   float c = 0.01;      // Step-size cap C
@@ -74,9 +75,10 @@ int main(int argc, char** argv)
   po::options_description desc("Allowed options");
   desc.add_options()
   ("help,h", po::value(&help)->zero_tokens()->default_value(false), "Print this help message and exit")
-  ("type,t", po::value<string>(&type), "Either nbest or lattice")
+  ("type,t", po::value<string>(&type), "Either nbest or hypergraph")
   ("scfile,S", po::value<vector<string> >(&scoreFiles), "Scorer data files")
   ("ffile,F", po::value<vector<string> > (&featureFiles), "Feature data files")
+  ("hgdir,H", po::value<string> (&hgDir), "Directory containing hypergraphs")
   ("random-seed,r", po::value<int>(&seed), "Seed for random number generation")
   ("output-file,o", po::value<string>(&outputFile), "Output file")
   ("cparam,C", po::value<float>(&c), "MIRA C-parameter, lower for more regularization (default 0.01)")
@@ -170,8 +172,8 @@ int main(int argc, char** argv)
   boost::scoped_ptr<HopeFearDecoder> decoder;
   if (type == "nbest") {
     decoder.reset(new NbestHopeFearDecoder(featureFiles, scoreFiles, streaming, no_shuffle, safe_hope));
-  } else if (type == "lattice") {
-    //initialise lattice decoder
+  } else if (type == "hypergraph") {
+    decoder.reset(new HypergraphHopeFearDecoder(hgDir, streaming, no_shuffle, safe_hope));
   } else {
     UTIL_THROW(util::Exception, "Unknown batch mira type: '" << type << "'");
   }

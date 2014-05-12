@@ -109,7 +109,7 @@ size_t ReferenceSet::NgramMatches(size_t sentenceId, const WordVec& ngram, bool 
 
 VertexState::VertexState(): bleuStats(kNgramOrder) {}
 
-void BleuScorer::UpdateMatches(const NgramCounter& counts, valarray<size_t>& bleuStats ) const {
+void HgBleuScorer::UpdateMatches(const NgramCounter& counts, valarray<size_t>& bleuStats ) const {
   for (NgramCounter::const_iterator ngi = counts.begin(); ngi != counts.end(); ++ngi) {
     //cerr << "Checking: " << *ngi << " matches " << references_.NgramMatches(sentenceId_,*ngi,false) <<  endl;
     size_t order = ngi->size();
@@ -119,7 +119,7 @@ void BleuScorer::UpdateMatches(const NgramCounter& counts, valarray<size_t>& ble
   }
 }
 
-size_t BleuScorer::GetTargetLength(const Edge& edge) const {
+size_t HgBleuScorer::GetTargetLength(const Edge& edge) const {
   size_t targetLength = 0;
   for (size_t i = 0; i < edge.Words().size(); ++i) {
     const Vocab::Entry* word = edge.Words()[i];
@@ -132,7 +132,7 @@ size_t BleuScorer::GetTargetLength(const Edge& edge) const {
   return targetLength;
 }
 
-FeatureStatsType BleuScorer::Score(const Edge& edge, const Vertex& head, valarray<size_t>& bleuStats) const {
+FeatureStatsType HgBleuScorer::Score(const Edge& edge, const Vertex& head, valarray<size_t>& bleuStats) const {
   NgramCounter ngramCounts;
   size_t childId = 0;
   size_t wordId = 0;
@@ -241,7 +241,7 @@ FeatureStatsType BleuScorer::Score(const Edge& edge, const Vertex& head, valarra
   return bleu;
 }
 
-void BleuScorer::UpdateState(const Edge& winnerEdge, size_t vertexId, const valarray<size_t>& bleuStats) {
+void HgBleuScorer::UpdateState(const Edge& winnerEdge, size_t vertexId, const valarray<size_t>& bleuStats) {
   //TODO: Maybe more efficient to absorb into the Score() method
   VertexState& vertexState = vertexStates_[vertexId];
   
@@ -332,7 +332,7 @@ void Viterbi(const Graph& graph, const SparseVector& weights, float bleuWeight, 
 {
   BackPointer init(NULL,kMinScore);
   vector<BackPointer> backPointers(graph.VertexSize(),init);
-  BleuScorer bleuScorer(references, graph, sentenceId);
+  HgBleuScorer bleuScorer(references, graph, sentenceId);
   for (size_t vi = 0; vi < graph.VertexSize(); ++vi) {
     //cerr << "vertex id " << vi <<  endl;
     const Vertex& vertex = graph.GetVertex(vi);

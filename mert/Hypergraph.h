@@ -218,10 +218,10 @@ class Graph : boost::noncopyable {
     Vocab vocab_;
 };
 
-class FormatException : public util::Exception {
+class HypergraphException : public util::Exception {
   public:
-    FormatException() {}
-    ~FormatException() throw() {}
+    HypergraphException() {}
+    ~HypergraphException() throw() {}
 };
 
 
