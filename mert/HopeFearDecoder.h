@@ -34,6 +34,21 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 namespace MosesTuning {
 
+/** To be filled in by the decoder */
+struct HopeFearData {
+  MiraFeatureVector modelFeatures;
+  MiraFeatureVector hopeFeatures;
+  MiraFeatureVector fearFeatures;
+  
+  std::vector<float> modelStats;
+  std::vector<float> hopeStats;
+
+  ValType hopeBleu;
+  ValType fearBleu;
+
+  bool hopeFearEqual;
+};
+
 //Abstract base class
 class HopeFearDecoder {
 public:
@@ -43,22 +58,20 @@ public:
   virtual bool finished() = 0;
 
   /**
-    * Accepts equal length vectors of model and bleu weights, returns the hypothoses maximimising
-    * modelScore*modelWeights[i] + bleu*bleuWeights[i] for each i
+    * Calculate hope, fear and model hypotheses
     **/
   virtual void HopeFear(
               const std::vector<ValType> backgroundBleu,
               const MiraWeightVector& wv,
-              MiraFeatureVector* modelFeatures,
-              MiraFeatureVector* hopeFeatures,
-              MiraFeatureVector* fearFeatures,
-              std::vector<float>* modelBleuStats,
-              std::vector<float>* hopeBleuStats,
-              ValType* hopeBleu,
-              ValType* fearBleu,
-              bool* hopeFearEqual
+              HopeFearData* hopeFear
               ) = 0;
 
+  /** Max score decoding */
+  virtual void MaxModel(const AvgWeightVector& wv, std::vector<ValType>* stats)
+    = 0;
+
+  /** Calculate bleu on training set */
+  ValType Evaluate(const AvgWeightVector& wv);
 
 };
 
@@ -79,15 +92,10 @@ public:
   virtual void HopeFear(
               const std::vector<ValType> backgroundBleu,
               const MiraWeightVector& wv,
-              MiraFeatureVector* modelFeatures,
-              MiraFeatureVector* hopeFeatures,
-              MiraFeatureVector* fearFeatures,
-              std::vector<float>* modelBleuStats,
-              std::vector<float>* hopeBleuStats,
-              ValType* hopeBleu,
-              ValType* fearBleu,
-              bool* hopeFearEqual
+              HopeFearData* hopeFear
               );
+
+  virtual void MaxModel(const AvgWeightVector& wv, std::vector<ValType>* stats);
 
 private:
   boost::scoped_ptr<HypPackEnumerator> train_;

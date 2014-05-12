@@ -28,6 +28,18 @@ namespace MosesTuning {
 
 static const ValType BLEU_RATIO = 5;
 
+ValType HopeFearDecoder::Evaluate(const AvgWeightVector& wv) {
+  vector<ValType> stats(kBleuNgramOrder*2+1,0);
+  for(reset(); !finished(); next()) {
+    vector<ValType> sent;
+    MaxModel(wv,&sent);
+    for(size_t i=0; i<sent.size(); i++) {
+      stats[i]+=sent[i];
+    }
+  }
+  return unsmoothedBleu(stats);
+}
+
 NbestHopeFearDecoder::NbestHopeFearDecoder(
       const vector<string>& featureFiles,
       const vector<string>&  scoreFiles,
@@ -58,14 +70,7 @@ void NbestHopeFearDecoder::reset() {
 void NbestHopeFearDecoder::HopeFear(
               const std::vector<ValType> backgroundBleu,
               const MiraWeightVector& wv,
-              MiraFeatureVector* modelFeatures,
-              MiraFeatureVector* hopeFeatures,
-              MiraFeatureVector* fearFeatures,
-              vector<float>* modelBleuStats,
-              vector<float>* hopeBleuStats,
-              ValType* hopeBleu,
-              ValType* fearBleu,
-              bool* hopeFearEqual
+              HopeFearData* hopeFear
               ) {
 
   
@@ -104,19 +109,33 @@ void NbestHopeFearDecoder::HopeFear(
       hope_scale = abs(hope_bleu) / abs(hope_model);
     else break;
   }
-  *modelFeatures = train_->featuresAt(model_index);
-  *hopeFeatures = train_->featuresAt(hope_index);
-  *fearFeatures = train_->featuresAt(fear_index);
+  hopeFear->modelFeatures = train_->featuresAt(model_index);
+  hopeFear->hopeFeatures = train_->featuresAt(hope_index);
+  hopeFear->fearFeatures = train_->featuresAt(fear_index);
 
-  *hopeBleuStats = train_->scoresAt(hope_index);
-  *hopeBleu = sentenceLevelBackgroundBleu(*hopeBleuStats, backgroundBleu);
+  hopeFear->hopeStats = train_->scoresAt(hope_index);
+  hopeFear->hopeBleu = sentenceLevelBackgroundBleu(hopeFear->hopeStats, backgroundBleu);
   const vector<float>& fear_stats = train_->scoresAt(fear_index);
-  *fearBleu = sentenceLevelBackgroundBleu(fear_stats, backgroundBleu);
+  hopeFear->fearBleu = sentenceLevelBackgroundBleu(fear_stats, backgroundBleu);
 
-  *modelBleuStats = train_->scoresAt(model_index);
-  *hopeFearEqual = (hope_index == fear_index);
+  hopeFear->modelStats = train_->scoresAt(model_index);
+  hopeFear->hopeFearEqual = (hope_index == fear_index);
 }
 
+void NbestHopeFearDecoder::MaxModel(const AvgWeightVector& wv, std::vector<ValType>* stats) {
+  // Find max model
+  size_t max_index=0;
+  ValType max_score=0;
+  for(size_t i=0; i<train_->cur_size(); i++) {
+    MiraFeatureVector vec(train_->featuresAt(i));
+    ValType score = wv.score(vec);
+    if(i==0 || score > max_score) {
+      max_index = i;
+      max_score = score;
+    }
+  }
+  *stats = train_->scoresAt(max_index);
+}
 
 
 };

@@ -43,7 +43,6 @@ de recherches du Canada
 
 #include "BleuScorer.h"
 #include "HopeFearDecoder.h"
-#include "HypPackEnumerator.h"
 #include "MiraFeatureVector.h"
 #include "MiraWeightVector.h"
 
@@ -51,30 +50,6 @@ using namespace std;
 using namespace MosesTuning;
 
 namespace po = boost::program_options;
-
-ValType evaluate(HypPackEnumerator* train, const AvgWeightVector& wv)
-{
-  vector<ValType> stats(kBleuNgramOrder*2+1,0);
-  for(train->reset(); !train->finished(); train->next()) {
-    // Find max model
-    size_t max_index=0;
-    ValType max_score=0;
-    for(size_t i=0; i<train->cur_size(); i++) {
-      MiraFeatureVector vec(train->featuresAt(i));
-      ValType score = wv.score(vec);
-      if(i==0 || score > max_score) {
-        max_index = i;
-        max_score = score;
-      }
-    }
-    // Update stats
-    const vector<float>& sent = train->scoresAt(max_index);
-    for(size_t i=0; i<sent.size(); i++) {
-      stats[i]+=sent[i];
-    }
-  }
-  return unsmoothedBleu(stats);
-}
 
 int main(int argc, char** argv)
 {
@@ -202,12 +177,7 @@ int main(int argc, char** argv)
   }
 
   // Training loop
-  boost::scoped_ptr<HypPackEnumerator> train;
-  if(streaming)
-    train.reset(new StreamingHypPackEnumerator(featureFiles, scoreFiles));
-  else
-    train.reset(new RandomAccessHypPackEnumerator(featureFiles, scoreFiles, no_shuffle));
-  cerr << "Initial BLEU = " << evaluate(train.get(), wv.avg()) << endl;
+  cerr << "Initial BLEU = " << decoder->Evaluate(wv.avg()) << endl;
   ValType bestBleu = 0;
   for(int j=0; j<n_iters; j++) {
     // MIRA train for one epoch
@@ -216,29 +186,26 @@ int main(int argc, char** argv)
     ValType totalLoss = 0.0;
     size_t sentenceIndex = 0;
     for(decoder->reset();!decoder->finished(); decoder->next()) {
-      MiraFeatureVector hope,fear,model;
-      ValType hopeBleu,fearBleu;
-      vector<float> model_stats,hope_stats;
-      bool hopeFearEqual;
-      decoder->HopeFear(bg,wv,&model,&hope,&fear,&model_stats,&hope_stats,&hopeBleu,&fearBleu,&hopeFearEqual);
+      HopeFearData hfd;
+      decoder->HopeFear(bg,wv,&hfd);
     
       // Update weights
-      if(!hopeFearEqual) { 
+      if(!hfd.hopeFearEqual) { 
         // Vector difference
-        MiraFeatureVector diff = hope - fear;
+        MiraFeatureVector diff = hfd.hopeFeatures - hfd.fearFeatures;
         // Bleu difference
-        assert(hopeBleu + 1e-8 >= fearBleu);
-        ValType delta = hopeBleu - fearBleu;
+        assert(hfd.hopeBleu + 1e-8 >= hfd.fearBleu);
+        ValType delta = hfd.hopeBleu - hfd.fearBleu;
         // Loss and update
         ValType diff_score = wv.score(diff);
         ValType loss = delta - diff_score;
         if(verbose) {
           cerr << "Updating sent " << sentenceIndex << endl;
           cerr << "Wght: " << wv << endl;
-          cerr << "Hope: " << hope << " BLEU:" << hopeBleu << " Score:" << wv.score(hope) << endl;
-          cerr << "Fear: " << fear << " BLEU:" << fearBleu << " Score:" << wv.score(fear) << endl;
+          cerr << "Hope: " << hfd.hopeFeatures << " BLEU:" << hfd.hopeBleu << " Score:" << wv.score(hfd.hopeFeatures) << endl;
+          cerr << "Fear: " << hfd.fearFeatures << " BLEU:" << hfd.fearBleu << " Score:" << wv.score(hfd.fearFeatures) << endl;
           cerr << "Diff: " << diff << " BLEU:" << delta << " Score:" << diff_score << endl;
-          cerr << "Loss: " << loss << endl; //" Scale: " << hope_scale << endl;
+          cerr << "Loss: " << loss <<  " Scale: " << 1 << endl;
           cerr << endl;
         }
         if(loss > 0) {
@@ -251,9 +218,9 @@ int main(int argc, char** argv)
         for(size_t k=0; k<bg.size(); k++) {
           bg[k]*=decay;
           if(model_bg)
-            bg[k]+=model_stats[k];
+            bg[k]+=hfd.modelStats[k];
           else
-            bg[k]+=hope_stats[k];
+            bg[k]+=hfd.hopeStats[k];
         }
       }
       iNumExamples++;
@@ -266,15 +233,16 @@ int main(int argc, char** argv)
 
     // Evaluate current average weights
     AvgWeightVector avg = wv.avg();
-    ValType bleu = evaluate(train.get(), avg);
+    ValType bleu = decoder->Evaluate(avg);
     cerr << ", BLEU = " << bleu << endl;
     if(bleu > bestBleu) {
+      /*
       size_t num_dense = train->num_dense();
       if(initDenseSize>0 && initDenseSize!=num_dense) {
         cerr << "Error: Initial dense feature count and dense feature count from n-best do not match: "
              << initDenseSize << "!=" << num_dense << endl;
         exit(1);
-      }
+      }*/
       // Write to a file
       ostream* out;
       ofstream outFile;
@@ -289,11 +257,11 @@ int main(int argc, char** argv)
         out = &cout;
       }
       for(size_t i=0; i<avg.size(); i++) {
-        if(i<num_dense)
+        if(i<initDenseSize)
           *out << "F" << i << " " << avg.weight(i) << endl;
         else {
           if(abs(avg.weight(i))>1e-8)
-            *out << SparseVector::decode(i-num_dense) << " " << avg.weight(i) << endl;
+            *out << SparseVector::decode(i-initDenseSize) << " " << avg.weight(i) << endl;
         }
       }
       outFile.close();
