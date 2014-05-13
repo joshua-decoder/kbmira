@@ -94,10 +94,16 @@ int main(int argc, char** argv)
   for (size_t i = 0; i < 10; ++i) {
     cerr << graph.GetEdge(i).GetScore(weights) << endl;
   }*/
-  WordVec translation;
-  Viterbi(graph,weights,bleuWeight,referenceSet,5,&translation);
-  for (size_t i = 0; i < translation.size(); ++i) {
-    cerr << translation[i]->first << " ";
+  HgHypothesis bestHypo;
+  Viterbi(graph,weights,bleuWeight,referenceSet,5,&bestHypo);
+  for (size_t i = 0; i < bestHypo.text.size(); ++i) {
+    cerr << bestHypo.text[i]->first << " ";
   }
+  cerr << endl;
+  for (size_t i = 0; i < bestHypo.bleuStats.size(); ++i) {
+    cerr << bestHypo.bleuStats[i] << " ";
+  }
+  cerr << endl;
+  bestHypo.featureVector.write(cerr);
   cerr << endl;
 }

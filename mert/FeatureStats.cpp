@@ -91,6 +91,16 @@ void SparseVector::load(const string& file)
   }
 }
 
+SparseVector& SparseVector::operator+=(const SparseVector& rhs)
+{
+
+  for (fvector_t::const_iterator i = rhs.m_fvector.begin();
+       i != rhs.m_fvector.end(); ++i) {
+    m_fvector[i->first] =  get(i->first) + (i->second);
+  }
+  return *this;
+}
+
 SparseVector& SparseVector::operator-=(const SparseVector& rhs)
 {
 

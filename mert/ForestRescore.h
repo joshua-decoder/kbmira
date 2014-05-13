@@ -109,8 +109,13 @@ class HgBleuScorer {
     size_t GetTargetLength(const Edge& edge) const;
 };
 
+struct HgHypothesis {
+  SparseVector featureVector;
+  WordVec text;
+  std::valarray<size_t> bleuStats;
+};
 
-void Viterbi(const Graph& graph, const SparseVector& weights, float bleuWeight, const ReferenceSet& references, size_t sentenceId,  WordVec* text);
+void Viterbi(const Graph& graph, const SparseVector& weights, float bleuWeight, const ReferenceSet& references, size_t sentenceId,  HgHypothesis* bestHypo);
 
 };
 

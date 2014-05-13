@@ -26,13 +26,12 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include "util/file_piece.hh"
 #include "util/tokenize_piece.hh"
 
+#include "BleuScorer.h"
 #include "ForestRescore.h"
 
 using namespace std;
 
 namespace MosesTuning {
-
-static const size_t kNgramOrder = 4;
 
 std::ostream& operator<<(std::ostream& out, const WordVec& wordVec) {
   out << "[";
@@ -68,7 +67,7 @@ void ReferenceSet::Load(vector<string>& files, Vocab& vocab) {
           k->push_back(nextTok);
           ngramCounts.insert(*k);
         }
-        if (openNgrams.size() >=  kNgramOrder) openNgrams.pop_back();
+        if (openNgrams.size() >=  kBleuNgramOrder) openNgrams.pop_back();
       }
 
       //merge into overall ngram map
@@ -107,7 +106,7 @@ size_t ReferenceSet::NgramMatches(size_t sentenceId, const WordVec& ngram, bool 
   return clip ? ngi->second.first : ngi->second.second;
 }
 
-VertexState::VertexState(): bleuStats(kNgramOrder) {}
+VertexState::VertexState(): bleuStats(kBleuNgramOrder) {}
 
 void HgBleuScorer::UpdateMatches(const NgramCounter& counts, valarray<size_t>& bleuStats ) const {
   for (NgramCounter::const_iterator ngi = counts.begin(); ngi != counts.end(); ++ngi) {
@@ -163,7 +162,7 @@ FeatureStatsType HgBleuScorer::Score(const Edge& edge, const Vertex& head, valar
           currentWord = vertexState->leftContext[contextId];
         } else if (inLeftContext) {
           //at end of left context
-          if (vertexState->leftContext.size() == kNgramOrder-1) {
+          if (vertexState->leftContext.size() == kBleuNgramOrder-1) {
             //full size context, jump to right state
             openNgrams.clear();
             inLeftContext = false;
@@ -199,7 +198,7 @@ FeatureStatsType HgBleuScorer::Score(const Edge& edge, const Vertex& head, valar
       //Only insert ngrams that cross boundaries
       if (!vertexState || (inLeftContext && k->size() > contextId+1)) ngramCounts.insert(*k);
     }
-    if (openNgrams.size() >=  kNgramOrder) openNgrams.pop_back();
+    if (openNgrams.size() >=  kBleuNgramOrder) openNgrams.pop_back();
   }
   
   //Collect matches
@@ -222,7 +221,7 @@ FeatureStatsType HgBleuScorer::Score(const Edge& edge, const Vertex& head, valar
   }
   //cerr << endl;
 
-  logbleu /= kNgramOrder;
+  logbleu /= kBleuNgramOrder;
 
   //brevity
   FeatureStatsType sourceLength = head.SourceCovered();
@@ -250,7 +249,7 @@ void HgBleuScorer::UpdateState(const Edge& winnerEdge, size_t vertexId, const va
   const VertexState* childState = NULL;
   int contexti = 0; //index within child context
   int childi = 0;
-  while (vertexState.leftContext.size() < (kNgramOrder-1)) {
+  while (vertexState.leftContext.size() < (kBleuNgramOrder-1)) {
     if ((size_t)wi >= winnerEdge.Words().size()) break;
     const Vocab::Entry* word = winnerEdge.Words()[wi];
     if (word != NULL) {
@@ -276,7 +275,7 @@ void HgBleuScorer::UpdateState(const Edge& winnerEdge, size_t vertexId, const va
   wi = winnerEdge.Words().size() - 1;
   childState = NULL;
   childi = winnerEdge.Children().size() - 1;
-  while (vertexState.rightContext.size() < (kNgramOrder-1)) {
+  while (vertexState.rightContext.size() < (kBleuNgramOrder-1)) {
     if (wi < 0) break;
     const Vocab::Entry* word = winnerEdge.Words()[wi];
     if (word != NULL) {
@@ -312,27 +311,31 @@ typedef pair<const Edge*,FeatureStatsType> BackPointer;
 /**
  * Recurse through back pointers
  **/
-static void GetBestTranslate(size_t vertexId, const Graph& graph, const vector<BackPointer>& bps, WordVec* text) {
+static void GetBestHypothesis(size_t vertexId, const Graph& graph, const vector<BackPointer>& bps,
+     HgHypothesis* bestHypo) {
   if (!bps[vertexId].first) return;
   const Edge* prevEdge = bps[vertexId].first;
+  bestHypo->featureVector += prevEdge->Features();
   size_t childId = 0;
   for (size_t i = 0; i < prevEdge->Words().size(); ++i) {
     if (prevEdge->Words()[i] != NULL) {
-      text->push_back(prevEdge->Words()[i]);
+      bestHypo->text.push_back(prevEdge->Words()[i]);
     } else {
       size_t childVertexId = prevEdge->Children()[childId++];
-      WordVec childText;
-      GetBestTranslate(childVertexId,graph,bps,&childText);
-      text->insert(text->end(), childText.begin(), childText.end());
+      HgHypothesis childHypo;
+      GetBestHypothesis(childVertexId,graph,bps,&childHypo);
+      bestHypo->text.insert(bestHypo->text.end(), childHypo.text.begin(), childHypo.text.end());
+      bestHypo->featureVector += childHypo.featureVector;
     }
   }
 }
 
-void Viterbi(const Graph& graph, const SparseVector& weights, float bleuWeight, const ReferenceSet& references , size_t sentenceId,  WordVec* text) 
+void Viterbi(const Graph& graph, const SparseVector& weights, float bleuWeight, const ReferenceSet& references , size_t sentenceId,  HgHypothesis* bestHypo) 
 {
   BackPointer init(NULL,kMinScore);
   vector<BackPointer> backPointers(graph.VertexSize(),init);
   HgBleuScorer bleuScorer(references, graph, sentenceId);
+  valarray<size_t> winnerStats(kBleuNgramOrder);
   for (size_t vi = 0; vi < graph.VertexSize(); ++vi) {
     //cerr << "vertex id " << vi <<  endl;
     const Vertex& vertex = graph.GetVertex(vi);
@@ -340,22 +343,22 @@ void Viterbi(const Graph& graph, const SparseVector& weights, float bleuWeight, 
     if (!incoming.size()) {
       backPointers[vi].second = 0;  
     } else {
-      valarray<size_t> winnerStats(kNgramOrder*2);
       for (size_t ei = 0; ei < incoming.size(); ++ei) {
         //cerr << "edge id " << ei << endl;
         FeatureStatsType incomingScore = incoming[ei]->GetScore(weights);
         for (size_t i = 0; i < incoming[ei]->Children().size(); ++i) {
           size_t childId = incoming[ei]->Children()[i];
           UTIL_THROW_IF(backPointers[childId].second == kMinScore,
-            FormatException, "Graph was not topologically sorted. curr=" << vi << " prev=" << childId);
+            HypergraphException, "Graph was not topologically sorted. curr=" << vi << " prev=" << childId);
           incomingScore += backPointers[childId].second;
         }
-        valarray<size_t> bleuStats(kNgramOrder*2);
-        if (bleuWeight) {
+        valarray<size_t> bleuStats(kBleuNgramOrder*2);
+        //NB: Even if bleuWeight = 0, we need to return the bleu score.
+        //if (bleuWeight) { 
           FeatureStatsType bleuScore = bleuScorer.Score(*(incoming[ei]), vertex, bleuStats);
           incomingScore += bleuWeight * bleuScore;
           //cerr << "is " << incomingScore << " bs " << bleuScore << endl;
-        }
+        //}
         if (incomingScore >= backPointers[vi].second) {
           backPointers[vi].first = incoming[ei];
           backPointers[vi].second = incomingScore;
@@ -363,14 +366,19 @@ void Viterbi(const Graph& graph, const SparseVector& weights, float bleuWeight, 
         }
       }
       //update with winner
-      if (bleuWeight) {
+      //if (bleuWeight) {
         bleuScorer.UpdateState(*(backPointers[vi].first), vi, winnerStats);
-      }
+      //}
     }
   }
 
   //expand back pointers
-  GetBestTranslate(graph.VertexSize()-1, graph, backPointers, text);
+  GetBestHypothesis(graph.VertexSize()-1, graph, backPointers, bestHypo);
+
+  //bleu stats and fv
+  bestHypo->bleuStats.resize(kBleuNgramOrder*2+1);
+  bestHypo->bleuStats += winnerStats;
+  bestHypo->bleuStats[kBleuNgramOrder*2] = references.Length(sentenceId);
 }
 
 

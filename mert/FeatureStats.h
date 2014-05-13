@@ -40,6 +40,7 @@ public:
   void write(std::ostream& out, const std::string& sep = " ") const;
 
   SparseVector& operator-=(const SparseVector& rhs);
+  SparseVector& operator+=(const SparseVector& rhs);
   FeatureStatsType inner_product(const SparseVector& rhs) const;
 
   // Added by cherryc
