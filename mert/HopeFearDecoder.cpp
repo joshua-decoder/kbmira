@@ -20,6 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <cmath>
 
 #include <boost/filesystem.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include "util/exception.hh"
 #include "util/file_piece.hh"
@@ -148,6 +149,7 @@ void NbestHopeFearDecoder::MaxModel(const AvgWeightVector& wv, std::vector<ValTy
 HypergraphHopeFearDecoder::HypergraphHopeFearDecoder
                           (
                             const string& hypergraphDir,
+                            const vector<string>& referenceFiles,
                             bool streaming,
                             bool no_shuffle,
                             bool safe_hope
@@ -155,16 +157,22 @@ HypergraphHopeFearDecoder::HypergraphHopeFearDecoder
 
   UTIL_THROW_IF(streaming, util::Exception, "Streaming not currently supported for hypergraphs");
   UTIL_THROW_IF(!fs::exists(hypergraphDir), HypergraphException, "Directory '" << hypergraphDir << "' does not exist");
+  UTIL_THROW_IF(!referenceFiles.size(), util::Exception, "No reference files supplied");
   static const string kWeights = "weights";
   fs::directory_iterator dend;
   for (fs::directory_iterator di(hypergraphDir); di != dend; ++di) {
     boost::shared_ptr<Graph> graph;
-    graph.reset(new Graph());
+    graph.reset(new Graph(vocab_));
     if (di->path().filename() == kWeights) continue;
+    size_t id = boost::lexical_cast<size_t>(di->path().stem().string());
     util::FilePiece file(di->path().string().c_str());
+    cerr << "Reading hg" << id << endl;
     ReadGraph(file,*graph);
-    graphs_.push_back(graph);
+    graphs_[id] = graph;
   }
+
+  references_.Load(referenceFiles, vocab_);
+
 }
 
 void HypergraphHopeFearDecoder::reset() {
@@ -187,7 +195,9 @@ void HypergraphHopeFearDecoder::HopeFear(
 }
 
 void HypergraphHopeFearDecoder::MaxModel(const AvgWeightVector& wv, vector<ValType>* stats) {
-
+  assert(!finished());
+  HgHypothesis bestHypo;
+  size_t sentenceId = graphIter->first;
 }
 
 

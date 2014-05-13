@@ -182,6 +182,7 @@ class Vertex {
 
 class Graph : boost::noncopyable {
   public:
+    Graph(Vocab& vocab) : vocab_(vocab) {}
 
     void SetCounts(std::size_t vertices, std::size_t edges) {
       vertices_.Init(vertices);
@@ -215,7 +216,7 @@ class Graph : boost::noncopyable {
   private:
     FixedAllocator<Edge> edges_;    
     FixedAllocator<Vertex> vertices_;
-    Vocab vocab_;
+    Vocab& vocab_;
 };
 
 class HypergraphException : public util::Exception {

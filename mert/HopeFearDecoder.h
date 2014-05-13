@@ -114,6 +114,7 @@ class HypergraphHopeFearDecoder : public virtual HopeFearDecoder {
 public:
   HypergraphHopeFearDecoder(
                             const std::string& hypergraphDir,
+                            const std::vector<std::string>& referenceFiles,
                             bool streaming,
                             bool no_shuffle,
                             bool safe_hope
@@ -132,10 +133,12 @@ public:
   virtual void MaxModel(const AvgWeightVector& wv, std::vector<ValType>* stats);
 
 private:
-  typedef std::vector<boost::shared_ptr<Graph> > GraphVec;
-  GraphVec graphs_;
-  GraphVec::const_iterator graphIter_;
-
+  //maps sentence Id to graph ptr
+  typedef std::map<size_t, boost::shared_ptr<Graph> > GraphColl;
+  GraphColl graphs_;
+  GraphColl::const_iterator graphIter_;
+  ReferenceSet references_;
+  Vocab vocab_;
 };
 
 };

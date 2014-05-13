@@ -59,7 +59,7 @@ class ReferenceSet {
 
 public:
 
-  void Load(std::vector<std::string>& files, Vocab& vocab);
+  void Load(const std::vector<std::string>& files, Vocab& vocab);
 
   size_t NgramMatches(size_t sentenceId, const WordVec&, bool clip) const;
 

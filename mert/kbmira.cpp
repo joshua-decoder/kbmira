@@ -59,6 +59,7 @@ int main(int argc, char** argv)
   string type = "nbest";
   vector<string> scoreFiles;
   vector<string> featureFiles;
+  vector<string> referenceFiles; //for hg mira
   string hgDir;
   int seed;
   string outputFile;
@@ -79,6 +80,7 @@ int main(int argc, char** argv)
   ("scfile,S", po::value<vector<string> >(&scoreFiles), "Scorer data files")
   ("ffile,F", po::value<vector<string> > (&featureFiles), "Feature data files")
   ("hgdir,H", po::value<string> (&hgDir), "Directory containing hypergraphs")
+  ("reference,R", po::value<vector<string> > (&referenceFiles), "Reference files, only required for hypergraph mira")
   ("random-seed,r", po::value<int>(&seed), "Seed for random number generation")
   ("output-file,o", po::value<string>(&outputFile), "Output file")
   ("cparam,C", po::value<float>(&c), "MIRA C-parameter, lower for more regularization (default 0.01)")
@@ -173,7 +175,7 @@ int main(int argc, char** argv)
   if (type == "nbest") {
     decoder.reset(new NbestHopeFearDecoder(featureFiles, scoreFiles, streaming, no_shuffle, safe_hope));
   } else if (type == "hypergraph") {
-    decoder.reset(new HypergraphHopeFearDecoder(hgDir, streaming, no_shuffle, safe_hope));
+    decoder.reset(new HypergraphHopeFearDecoder(hgDir, referenceFiles, streaming, no_shuffle, safe_hope));
   } else {
     UTIL_THROW(util::Exception, "Unknown batch mira type: '" << type << "'");
   }

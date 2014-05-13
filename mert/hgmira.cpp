@@ -74,8 +74,9 @@ int main(int argc, char** argv)
   util::FilePiece file(name.str().c_str());
  // lm::ngram::SortedVocabulary vocab;
 
+  Vocab vocab;
   
-  Graph graph;
+  Graph graph(vocab);
   ReadGraph(file, graph);
 
   ReferenceSet referenceSet;

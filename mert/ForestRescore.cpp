@@ -43,7 +43,7 @@ std::ostream& operator<<(std::ostream& out, const WordVec& wordVec) {
   return out;
 }
 
-void ReferenceSet::Load(vector<string>& files, Vocab& vocab) {
+void ReferenceSet::Load(const vector<string>& files, Vocab& vocab) {
   for (size_t i = 0; i < files.size(); ++i) {
     util::FilePiece fh(files[i].c_str());
     size_t sentenceId = 0;
