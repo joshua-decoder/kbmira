@@ -63,6 +63,11 @@ public:
    */
   AvgWeightVector avg();
 
+  /**
+    * Convert to sparse vector, interpreting all features as sparse.
+   **/
+  void ToSparse(SparseVector* sparse) const;
+
   friend class AvgWeightVector;
 
   friend std::ostream& operator<<(std::ostream& o, const MiraWeightVector& e);
@@ -99,6 +104,7 @@ public:
   ValType score(const MiraFeatureVector& fv) const;
   ValType weight(std::size_t index) const;
   std::size_t size() const;
+  void ToSparse(SparseVector* sparse) const;
 private:
   const MiraWeightVector& m_wv;
 };

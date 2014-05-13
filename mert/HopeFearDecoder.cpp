@@ -197,7 +197,20 @@ void HypergraphHopeFearDecoder::HopeFear(
 void HypergraphHopeFearDecoder::MaxModel(const AvgWeightVector& wv, vector<ValType>* stats) {
   assert(!finished());
   HgHypothesis bestHypo;
-  size_t sentenceId = graphIter->first;
+  size_t sentenceId = graphIter_->first;
+  SparseVector weights;
+  wv.ToSparse(&weights);
+  Viterbi(*(graphIter_->second), weights, 0, references_, sentenceId, &bestHypo);
+  stats->resize(bestHypo.bleuStats.size());
+  /*
+  for (size_t i = 0; i < bestHypo.text.size(); ++i) {
+    cerr << bestHypo.text[i]->first << " ";
+  }
+  cerr << endl;
+  */
+  for (size_t i = 0; i < bestHypo.bleuStats.size(); ++i) {
+    (*stats)[i] = bestHypo.bleuStats[i];
+  }
 }
 
 

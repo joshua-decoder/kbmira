@@ -59,6 +59,11 @@ void SparseVector::set(const string& name, FeatureStatsType value)
   m_fvector[id] = value;
 }
 
+void SparseVector::set(size_t id, FeatureStatsType value) {
+  assert(m_id_to_name.size() > id);
+  m_fvector[id] = value;
+}
+
 void SparseVector::write(ostream& out, const string& sep) const
 {
   for (fvector_t::const_iterator i = m_fvector.begin(); i != m_fvector.end(); ++i) {
