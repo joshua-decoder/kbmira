@@ -86,7 +86,7 @@ int main(int argc, char** argv)
   ("cparam,C", po::value<float>(&c), "MIRA C-parameter, lower for more regularization (default 0.01)")
   ("decay,D", po::value<float>(&decay), "BLEU background corpus decay rate (default 0.999)")
   ("iters,J", po::value<int>(&n_iters), "Number of MIRA iterations to run (default 60)")
-  ("dense-init,d", po::value<string>(&denseInitFile), "Weight file for dense features")
+  ("dense-init,d", po::value<string>(&denseInitFile), "Weight file for dense features. This should have 'name= value' on each line, or (legacy) should be the Moses mert 'init.opt' format.")
   ("sparse-init,s", po::value<string>(&sparseInitFile), "Weight file for sparse features")
   ("streaming", po::value(&streaming)->zero_tokens()->default_value(false), "Stream n-best lists to save memory, implies --no-shuffle")
   ("no-shuffle", po::value(&no_shuffle)->zero_tokens()->default_value(false), "Don't shuffle hypotheses before each epoch")
@@ -128,12 +128,59 @@ int main(int argc, char** argv)
       cerr << "could not open dense initfile: " << denseInitFile << endl;
       exit(3);
     }
+    if (verbose) cerr << "Reading dense features:" << endl;
     parameter_t val;
     getline(opt,buffer);
-    istringstream strstrm(buffer);
-    while(strstrm >> val) {
-      initParams.push_back(val);
+    if (buffer.find_first_of("=") == buffer.npos) {
+      UTIL_THROW_IF(type == "hypergraph", util::Exception, "For hypergraph version, require dense features in 'name= value' format");
+      cerr << "WARN: dense features in deprecated Moses mert format. Prefer 'name= value' format." << endl;
+      istringstream strstrm(buffer);
+      while(strstrm >> val) {
+        initParams.push_back(val);
+        if(verbose) cerr << val << endl;
+      }
+    } else {
+      vector<string> names;
+      string last_name = "";
+      size_t feature_ctr = 0;
+      do {
+        size_t equals = buffer.find_last_of("=");
+        UTIL_THROW_IF(equals == buffer.npos, util::Exception, "Incorrect format in dense feature file: '"
+          << buffer << "'");
+        string name = buffer.substr(0,equals);
+        names.push_back(name);
+        initParams.push_back(boost::lexical_cast<ValType>(buffer.substr(equals+2)));
+
+        //Names for features with several values need to have their id added
+        if (name != last_name) feature_ctr = 0;
+        last_name = name;
+        if (feature_ctr) {
+          stringstream namestr;
+          namestr << names.back() << feature_ctr;
+          names[names.size()-1] = namestr.str();
+          if (feature_ctr == 1) {
+            stringstream namestr;
+            namestr << names[names.size()-2] << (feature_ctr-1);
+            names[names.size()-2] = namestr.str();
+          }
+        }
+        ++feature_ctr;
+
+      } while(getline(opt,buffer));
+
+
+      for (size_t i = 0; i < names.size(); ++i) {
+             }
+
+      //Make sure that SparseVector encodes dense feature names as 0..n-1.
+      for (size_t i = 0; i < names.size(); ++i) {
+        size_t id = SparseVector::encode(names[i]);
+        assert(id == i);     
+        if (verbose) cerr << names[i] << " " << initParams[i] << endl;
+      }
+
     }
+
     opt.close();
   }
   size_t initDenseSize = initParams.size();
@@ -175,7 +222,7 @@ int main(int argc, char** argv)
   if (type == "nbest") {
     decoder.reset(new NbestHopeFearDecoder(featureFiles, scoreFiles, streaming, no_shuffle, safe_hope));
   } else if (type == "hypergraph") {
-    decoder.reset(new HypergraphHopeFearDecoder(hgDir, referenceFiles, streaming, no_shuffle, safe_hope));
+    decoder.reset(new HypergraphHopeFearDecoder(hgDir, referenceFiles, initDenseSize, streaming, no_shuffle, safe_hope));
   } else {
     UTIL_THROW(util::Exception, "Unknown batch mira type: '" << type << "'");
   }
@@ -194,7 +241,7 @@ int main(int argc, char** argv)
       decoder->HopeFear(bg,wv,&hfd);
     
       // Update weights
-      if(!hfd.hopeFearEqual) { 
+      if (!hfd.hopeFearEqual) { 
         // Vector difference
         MiraFeatureVector diff = hfd.hopeFeatures - hfd.fearFeatures;
         // Bleu difference

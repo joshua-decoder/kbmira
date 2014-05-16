@@ -115,6 +115,7 @@ public:
   HypergraphHopeFearDecoder(
                             const std::string& hypergraphDir,
                             const std::vector<std::string>& referenceFiles,
+                            size_t num_dense,
                             bool streaming,
                             bool no_shuffle,
                             bool safe_hope
@@ -133,6 +134,7 @@ public:
   virtual void MaxModel(const AvgWeightVector& wv, std::vector<ValType>* stats);
 
 private:
+  size_t num_dense_;
   //maps sentence Id to graph ptr
   typedef std::map<size_t, boost::shared_ptr<Graph> > GraphColl;
   GraphColl graphs_;

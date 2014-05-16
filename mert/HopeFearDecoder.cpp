@@ -18,6 +18,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 ***********************************************************************/
 
 #include <cmath>
+#include <iterator>
 
 #include <boost/filesystem.hpp>
 #include <boost/lexical_cast.hpp>
@@ -150,10 +151,12 @@ HypergraphHopeFearDecoder::HypergraphHopeFearDecoder
                           (
                             const string& hypergraphDir,
                             const vector<string>& referenceFiles,
+                            size_t num_dense,
                             bool streaming,
                             bool no_shuffle,
                             bool safe_hope
-                          ) {
+                          ) :
+                          num_dense_(num_dense) {
 
   UTIL_THROW_IF(streaming, util::Exception, "Streaming not currently supported for hypergraphs");
   UTIL_THROW_IF(!fs::exists(hypergraphDir), HypergraphException, "Directory '" << hypergraphDir << "' does not exist");
@@ -192,6 +195,79 @@ void HypergraphHopeFearDecoder::HopeFear(
             const MiraWeightVector& wv,
             HopeFearData* hopeFear
             ) {
+  size_t sentenceId = graphIter_->first;
+  SparseVector weights;
+  wv.ToSparse(&weights);
+  const Graph& graph = *(graphIter_->second);
+
+  ValType hope_scale = 1.0;
+  HgHypothesis hopeHypo, fearHypo, modelHypo;
+  for(size_t safe_loop=0; safe_loop<2; safe_loop++) {
+
+    //hope decode
+    Viterbi(graph, weights, 100, references_, sentenceId, &hopeHypo);
+
+    //fear decode
+    Viterbi(graph, weights, -100, references_, sentenceId, &fearHypo);
+
+    //Model decode
+    Viterbi(graph, weights, 0, references_, sentenceId, &modelHypo);
+
+
+  // Outer loop rescales the contribution of model score to 'hope' in antagonistic cases
+    // where model score is having far more influence than BLEU
+  //  hope_bleu *= BLEU_RATIO; // We only care about cases where model has MUCH more influence than BLEU
+  //  if(safe_hope_ && safe_loop==0 && abs(hope_model)>1e-8 && abs(hope_bleu)/abs(hope_model)<hope_scale)
+  //    hope_scale = abs(hope_bleu) / abs(hope_model);
+  //  else break;
+    //TODO: Don't currently get model and bleu so commented this out for now.
+    break;
+  }
+  //modelFeatures, hopeFeatures and fearFeatures
+  hopeFear->modelFeatures = MiraFeatureVector(modelHypo.featureVector, num_dense_);
+  hopeFear->hopeFeatures = MiraFeatureVector(hopeHypo.featureVector, num_dense_);
+  hopeFear->fearFeatures = MiraFeatureVector(fearHypo.featureVector, num_dense_);
+
+  //Need to know which are to be mapped to dense features!
+
+  //Only C++11
+  //hopeFear->modelStats.assign(std::begin(modelHypo.bleuStats), std::end(modelHypo.bleuStats));
+  vector<ValType> fearStats(kBleuNgramOrder*2+1);
+  hopeFear->hopeStats.reserve(kBleuNgramOrder*2+1);
+  hopeFear->modelStats.reserve(kBleuNgramOrder*2+1);
+  for (size_t i = 0; i < fearStats.size(); ++i) {
+    hopeFear->modelStats.push_back(modelHypo.bleuStats[i]);
+    hopeFear->hopeStats.push_back(hopeHypo.bleuStats[i]);
+
+    fearStats[i] = fearHypo.bleuStats[i];
+  }
+  cerr << "hope bleu";
+  for (size_t i = 0; i < fearStats.size(); ++i) {
+    cerr << " " << hopeHypo.bleuStats[i];
+  }
+  cerr << endl;
+  cerr << "fear bleu";
+  for (size_t i = 0; i < fearStats.size(); ++i) {
+    cerr << " " << fearHypo.bleuStats[i];
+  }
+  cerr << endl;
+  cerr << "model bleu";
+  for (size_t i = 0; i < fearStats.size(); ++i) {
+    cerr << " " << modelHypo.bleuStats[i];
+  }
+  cerr << endl;
+  hopeFear->hopeBleu = sentenceLevelBackgroundBleu(hopeFear->hopeStats, backgroundBleu);
+  hopeFear->fearBleu = sentenceLevelBackgroundBleu(fearStats, backgroundBleu);
+
+  //If fv and bleu stats are equal, then assume equal
+  hopeFear->hopeFearEqual = true;
+  for (size_t i = 0; i < fearStats.size(); ++i) {
+    if (fearStats[i] != hopeFear->hopeStats[i]) {
+       hopeFear->hopeFearEqual = false;
+       break;
+    }
+  }
+  hopeFear->hopeFearEqual = hopeFear->hopeFearEqual && (hopeFear->fearFeatures == hopeFear->hopeFeatures);
 }
 
 void HypergraphHopeFearDecoder::MaxModel(const AvgWeightVector& wv, vector<ValType>* stats) {
