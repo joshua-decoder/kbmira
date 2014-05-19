@@ -76,7 +76,7 @@ private:
 struct VertexState {
   VertexState();
 
-  std::valarray<size_t> bleuStats;
+  std::vector<FeatureStatsType> bleuStats;
   WordVec leftContext;
   WordVec rightContext;
   size_t targetLength;
@@ -87,15 +87,16 @@ struct VertexState {
 **/
 class HgBleuScorer {
   public:
-    HgBleuScorer(const ReferenceSet& references, const Graph& graph, size_t sentenceId):
-    references_(references), sentenceId_(sentenceId), graph_(graph) {
+    HgBleuScorer(const ReferenceSet& references, const Graph& graph, size_t sentenceId, const std::vector<FeatureStatsType>& backgroundBleu):
+    references_(references), sentenceId_(sentenceId), graph_(graph), backgroundBleu_(backgroundBleu),
+      backgroundRefLength_(backgroundBleu[kBleuNgramOrder*2]) {
       vertexStates_.resize(graph.VertexSize());
       totalSourceLength_ = graph.GetVertex(graph.VertexSize()-1).SourceCovered();
     }
 
-    FeatureStatsType Score(const Edge& edge, const Vertex& head, std::valarray<size_t>& bleuStats) const;
+    FeatureStatsType Score(const Edge& edge, const Vertex& head, std::vector<FeatureStatsType>& bleuStats) ;
 
-    void UpdateState(const Edge& winnerEdge, size_t vertexId, const std::valarray<size_t>& bleuStats);
+    void UpdateState(const Edge& winnerEdge, size_t vertexId, const std::vector<FeatureStatsType>& bleuStats);
 
 
   private:
@@ -104,18 +105,20 @@ class HgBleuScorer {
     size_t sentenceId_;
     size_t totalSourceLength_;
     const Graph& graph_;
+    std::vector<FeatureStatsType> backgroundBleu_;
+    FeatureStatsType backgroundRefLength_;
 
-    void UpdateMatches(const NgramCounter& counter, std::valarray<size_t>& bleuStats) const;
+    void UpdateMatches(const NgramCounter& counter, std::vector<FeatureStatsType>& bleuStats) const;
     size_t GetTargetLength(const Edge& edge) const;
 };
 
 struct HgHypothesis {
   SparseVector featureVector;
   WordVec text;
-  std::valarray<size_t> bleuStats;
+  std::vector<FeatureStatsType> bleuStats;
 };
 
-void Viterbi(const Graph& graph, const SparseVector& weights, float bleuWeight, const ReferenceSet& references, size_t sentenceId,  HgHypothesis* bestHypo);
+void Viterbi(const Graph& graph, const SparseVector& weights, float bleuWeight, const ReferenceSet& references, size_t sentenceId, const std::vector<FeatureStatsType>& backgroundBleu, HgHypothesis* bestHypo);
 
 };
 

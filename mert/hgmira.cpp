@@ -96,7 +96,8 @@ int main(int argc, char** argv)
     cerr << graph.GetEdge(i).GetScore(weights) << endl;
   }*/
   HgHypothesis bestHypo;
-  Viterbi(graph,weights,bleuWeight,referenceSet,5,&bestHypo);
+  vector<FeatureStatsType> bleuStats(9);
+  Viterbi(graph,weights,bleuWeight,referenceSet,5,bleuStats,&bestHypo);
   for (size_t i = 0; i < bestHypo.text.size(); ++i) {
     cerr << bestHypo.text[i]->first << " ";
   }

@@ -76,7 +76,7 @@ void NbestHopeFearDecoder::reset() {
 }
 
 void NbestHopeFearDecoder::HopeFear(
-              const std::vector<ValType> backgroundBleu,
+              const std::vector<ValType>& backgroundBleu,
               const MiraWeightVector& wv,
               HopeFearData* hopeFear
               ) {
@@ -191,7 +191,7 @@ bool HypergraphHopeFearDecoder::finished() {
 }
 
 void HypergraphHopeFearDecoder::HopeFear(
-            const vector<ValType> backgroundBleu,
+            const vector<ValType>& backgroundBleu,
             const MiraWeightVector& wv,
             HopeFearData* hopeFear
             ) {
@@ -205,13 +205,13 @@ void HypergraphHopeFearDecoder::HopeFear(
   for(size_t safe_loop=0; safe_loop<2; safe_loop++) {
 
     //hope decode
-    Viterbi(graph, weights, 100, references_, sentenceId, &hopeHypo);
+    Viterbi(graph, weights, 1, references_, sentenceId, backgroundBleu, &hopeHypo);
 
     //fear decode
-    Viterbi(graph, weights, -100, references_, sentenceId, &fearHypo);
+    Viterbi(graph, weights, -1, references_, sentenceId, backgroundBleu, &fearHypo);
 
     //Model decode
-    Viterbi(graph, weights, 0, references_, sentenceId, &modelHypo);
+    Viterbi(graph, weights, 0, references_, sentenceId, backgroundBleu, &modelHypo);
 
 
   // Outer loop rescales the contribution of model score to 'hope' in antagonistic cases
@@ -276,7 +276,8 @@ void HypergraphHopeFearDecoder::MaxModel(const AvgWeightVector& wv, vector<ValTy
   size_t sentenceId = graphIter_->first;
   SparseVector weights;
   wv.ToSparse(&weights);
-  Viterbi(*(graphIter_->second), weights, 0, references_, sentenceId, &bestHypo);
+  vector<ValType> bg(kBleuNgramOrder*2+1);
+  Viterbi(*(graphIter_->second), weights, 0, references_, sentenceId, bg, &bestHypo);
   stats->resize(bestHypo.bleuStats.size());
   /*
   for (size_t i = 0; i < bestHypo.text.size(); ++i) {

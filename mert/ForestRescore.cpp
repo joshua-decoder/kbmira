@@ -108,7 +108,7 @@ size_t ReferenceSet::NgramMatches(size_t sentenceId, const WordVec& ngram, bool 
 
 VertexState::VertexState(): bleuStats(kBleuNgramOrder) {}
 
-void HgBleuScorer::UpdateMatches(const NgramCounter& counts, valarray<size_t>& bleuStats ) const {
+void HgBleuScorer::UpdateMatches(const NgramCounter& counts, vector<FeatureStatsType>& bleuStats ) const {
   for (NgramCounter::const_iterator ngi = counts.begin(); ngi != counts.end(); ++ngi) {
     //cerr << "Checking: " << *ngi << " matches " << references_.NgramMatches(sentenceId_,*ngi,false) <<  endl;
     size_t order = ngi->size();
@@ -131,7 +131,7 @@ size_t HgBleuScorer::GetTargetLength(const Edge& edge) const {
   return targetLength;
 }
 
-FeatureStatsType HgBleuScorer::Score(const Edge& edge, const Vertex& head, valarray<size_t>& bleuStats) const {
+FeatureStatsType HgBleuScorer::Score(const Edge& edge, const Vertex& head, vector<FeatureStatsType>& bleuStats) {
   NgramCounter ngramCounts;
   size_t childId = 0;
   size_t wordId = 0;
@@ -208,10 +208,24 @@ FeatureStatsType HgBleuScorer::Score(const Edge& edge, const Vertex& head, valar
   //Child vertexes
   for (size_t i = 0; i < edge.Children().size(); ++i) {
     //cerr << "vertex ngrams " << edge.Children()[i] << endl;
-    bleuStats += vertexStates_[edge.Children()[i]].bleuStats;
+    for (size_t j = 0; j < bleuStats.size(); ++j) {
+      bleuStats[j] += vertexStates_[edge.Children()[i]].bleuStats[j];
+    }
   }
 
+  FeatureStatsType sourceLength = head.SourceCovered();
+  size_t referenceLength = references_.Length(sentenceId_);
+  FeatureStatsType effectiveReferenceLength = 
+    sourceLength / totalSourceLength_ * referenceLength;
+
+  bleuStats[bleuStats.size()-1] = effectiveReferenceLength;
+  backgroundBleu_[backgroundBleu_.size()-1] = 
+    backgroundRefLength_ * sourceLength / totalSourceLength_;
+  FeatureStatsType bleu = sentenceLevelBackgroundBleu(bleuStats, backgroundBleu_);
+
+
   //TODO: Add background - for now just do 0.01 smoothing
+  /*
   FeatureStatsType logbleu = 0.0;
   static FeatureStatsType kSmooth = 0.01;
   for (size_t i = 0; i < bleuStats.size(); i+=2) {
@@ -237,10 +251,11 @@ FeatureStatsType HgBleuScorer::Score(const Edge& edge, const Vertex& head, valar
   //cerr << "bleu after bp " << exp(logbleu) << endl;
 
   FeatureStatsType bleu = exp(logbleu);
+  */
   return bleu;
 }
 
-void HgBleuScorer::UpdateState(const Edge& winnerEdge, size_t vertexId, const valarray<size_t>& bleuStats) {
+void HgBleuScorer::UpdateState(const Edge& winnerEdge, size_t vertexId, const vector<FeatureStatsType>& bleuStats) {
   //TODO: Maybe more efficient to absorb into the Score() method
   VertexState& vertexState = vertexStates_[vertexId];
   
@@ -330,12 +345,12 @@ static void GetBestHypothesis(size_t vertexId, const Graph& graph, const vector<
   }
 }
 
-void Viterbi(const Graph& graph, const SparseVector& weights, float bleuWeight, const ReferenceSet& references , size_t sentenceId,  HgHypothesis* bestHypo) 
+void Viterbi(const Graph& graph, const SparseVector& weights, float bleuWeight, const ReferenceSet& references , size_t sentenceId, const std::vector<FeatureStatsType>& backgroundBleu,  HgHypothesis* bestHypo) 
 {
   BackPointer init(NULL,kMinScore);
   vector<BackPointer> backPointers(graph.VertexSize(),init);
-  HgBleuScorer bleuScorer(references, graph, sentenceId);
-  valarray<size_t> winnerStats(kBleuNgramOrder);
+  HgBleuScorer bleuScorer(references, graph, sentenceId, backgroundBleu);
+  vector<FeatureStatsType> winnerStats(kBleuNgramOrder*2+1);
   for (size_t vi = 0; vi < graph.VertexSize(); ++vi) {
     //cerr << "vertex id " << vi <<  endl;
     const Vertex& vertex = graph.GetVertex(vi);
@@ -352,13 +367,13 @@ void Viterbi(const Graph& graph, const SparseVector& weights, float bleuWeight, 
             HypergraphException, "Graph was not topologically sorted. curr=" << vi << " prev=" << childId);
           incomingScore += backPointers[childId].second;
         }
-        valarray<size_t> bleuStats(kBleuNgramOrder*2);
+        vector<FeatureStatsType> bleuStats(kBleuNgramOrder*2+1);
         //NB: Even if bleuWeight = 0, we need to return the bleu score.
-        //if (bleuWeight) { 
           FeatureStatsType bleuScore = bleuScorer.Score(*(incoming[ei]), vertex, bleuStats);
+        if (bleuWeight) { 
           incomingScore += bleuWeight * bleuScore;
           //cerr << "is " << incomingScore << " bs " << bleuScore << endl;
-        //}
+        }
         if (incomingScore >= backPointers[vi].second) {
           backPointers[vi].first = incoming[ei];
           backPointers[vi].second = incomingScore;
@@ -377,7 +392,9 @@ void Viterbi(const Graph& graph, const SparseVector& weights, float bleuWeight, 
 
   //bleu stats and fv
   bestHypo->bleuStats.resize(kBleuNgramOrder*2+1);
-  bestHypo->bleuStats += winnerStats;
+  for (size_t i = 0; i < bestHypo->bleuStats.size(); ++i) {
+    bestHypo->bleuStats[i] += winnerStats[i];
+  }
   bestHypo->bleuStats[kBleuNgramOrder*2] = references.Length(sentenceId);
 }
 
