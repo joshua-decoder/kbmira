@@ -65,7 +65,7 @@ void ReferenceSet::Load(const vector<string>& files, Vocab& vocab) {
         openNgrams.push_front(WordVec());
         for (list<WordVec>::iterator k = openNgrams.begin(); k != openNgrams.end();  ++k) {
           k->push_back(nextTok);
-          ngramCounts.insert(*k);
+          ++ngramCounts[*k]; 
         }
         if (openNgrams.size() >=  kBleuNgramOrder) openNgrams.pop_back();
       }
@@ -73,15 +73,15 @@ void ReferenceSet::Load(const vector<string>& files, Vocab& vocab) {
       //merge into overall ngram map
       for (NgramCounter::const_iterator ni = ngramCounts.begin();
         ni != ngramCounts.end(); ++ni) {
-        size_t count = ngramCounts.count(*ni);
+        size_t count = ni->second;
         //cerr << *ni << " " << count <<  endl;
         if (ngramCounts_.size() <= sentenceId) ngramCounts_.resize(sentenceId+1);
-        NgramMap::iterator totalsIter = ngramCounts_[sentenceId].find(*ni);
+        NgramMap::iterator totalsIter = ngramCounts_[sentenceId].find(ni->first);
         if (totalsIter == ngramCounts_[sentenceId].end()) {
-          ngramCounts_[sentenceId][*ni] = pair<size_t,size_t>(count,count);
+          ngramCounts_[sentenceId][ni->first] = pair<size_t,size_t>(count,count);
         } else {
-          ngramCounts_[sentenceId][*ni].first = max(count, ngramCounts_[sentenceId][*ni].first); //clip
-          ngramCounts_[sentenceId][*ni].second += count; //no clip
+          ngramCounts_[sentenceId][ni->first].first = max(count, ngramCounts_[sentenceId][ni->first].first); //clip
+          ngramCounts_[sentenceId][ni->first].second += count; //no clip
         }
       }
       //length
@@ -111,10 +111,10 @@ VertexState::VertexState(): bleuStats(kBleuNgramOrder) {}
 void HgBleuScorer::UpdateMatches(const NgramCounter& counts, vector<FeatureStatsType>& bleuStats ) const {
   for (NgramCounter::const_iterator ngi = counts.begin(); ngi != counts.end(); ++ngi) {
     //cerr << "Checking: " << *ngi << " matches " << references_.NgramMatches(sentenceId_,*ngi,false) <<  endl;
-    size_t order = ngi->size();
-    size_t count = counts.count(*ngi);
+    size_t order = ngi->first.size();
+    size_t count = ngi->second;
     bleuStats[(order-1)*2 + 1] += count;
-    bleuStats[(order-1) * 2] += min(count, references_.NgramMatches(sentenceId_,*ngi,false));
+    bleuStats[(order-1) * 2] += min(count, references_.NgramMatches(sentenceId_,ngi->first,false));
   }
 }
 
@@ -196,7 +196,7 @@ FeatureStatsType HgBleuScorer::Score(const Edge& edge, const Vertex& head, vecto
     for (list<WordVec>::iterator k = openNgrams.begin(); k != openNgrams.end();  ++k) {
       k->push_back(currentWord);
       //Only insert ngrams that cross boundaries
-      if (!vertexState || (inLeftContext && k->size() > contextId+1)) ngramCounts.insert(*k);
+      if (!vertexState || (inLeftContext && k->size() > contextId+1)) ++ngramCounts[*k];
     }
     if (openNgrams.size() >=  kBleuNgramOrder) openNgrams.pop_back();
   }
@@ -328,6 +328,7 @@ typedef pair<const Edge*,FeatureStatsType> BackPointer;
  **/
 static void GetBestHypothesis(size_t vertexId, const Graph& graph, const vector<BackPointer>& bps,
      HgHypothesis* bestHypo) {
+  //cerr << "Expanding " << vertexId << endl;
   if (!bps[vertexId].first) return;
   const Edge* prevEdge = bps[vertexId].first;
   bestHypo->featureVector += prevEdge->Features();
@@ -384,6 +385,21 @@ void Viterbi(const Graph& graph, const SparseVector& weights, float bleuWeight, 
       //if (bleuWeight) {
         bleuScorer.UpdateState(*(backPointers[vi].first), vi, winnerStats);
       //}
+          //debug
+          /*
+          cerr << "Setting backpointer " << vi <<  endl;
+          HgHypothesis newBest;
+          GetBestHypothesis(vi, graph, backPointers,&newBest);
+          for (size_t i = 0; i < newBest.text.size(); ++i) {
+            cerr << newBest.text[i]->first << " ";
+          }
+          cerr << endl;
+          for (size_t i = 0; i < winnerStats.size(); ++i) {
+            cerr << winnerStats[i] << " ";
+          }
+          cerr << endl;
+          */
+
     }
   }
 
@@ -391,9 +407,27 @@ void Viterbi(const Graph& graph, const SparseVector& weights, float bleuWeight, 
   GetBestHypothesis(graph.VertexSize()-1, graph, backPointers, bestHypo);
 
   //bleu stats and fv
+
+  //Need the actual (clipped) stats
+  //TODO: This repeats code in bleu scorer - factor out
   bestHypo->bleuStats.resize(kBleuNgramOrder*2+1);
-  for (size_t i = 0; i < bestHypo->bleuStats.size(); ++i) {
-    bestHypo->bleuStats[i] += winnerStats[i];
+  NgramCounter counts;
+  list<WordVec> openNgrams;
+  for (size_t i = 0; i < bestHypo->text.size(); ++i) {
+    const Vocab::Entry* entry = bestHypo->text[i];
+    if (graph.IsBoundary(entry)) continue;
+    openNgrams.push_front(WordVec());
+    for (list<WordVec>::iterator k = openNgrams.begin(); k != openNgrams.end();  ++k) {
+      k->push_back(entry);
+      ++counts[*k];
+    }
+    if (openNgrams.size() >=  kBleuNgramOrder) openNgrams.pop_back();
+  }
+  for (NgramCounter::const_iterator ngi = counts.begin(); ngi != counts.end(); ++ngi) {
+    size_t order = ngi->first.size();
+    size_t count = ngi->second;
+    bestHypo->bleuStats[(order-1)*2 + 1] += count;
+    bestHypo->bleuStats[(order-1) * 2] += min(count, references.NgramMatches(sentenceId,ngi->first,true));
   }
   bestHypo->bleuStats[kBleuNgramOrder*2] = references.Length(sentenceId);
 }

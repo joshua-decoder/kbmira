@@ -96,7 +96,13 @@ int main(int argc, char** argv)
     cerr << graph.GetEdge(i).GetScore(weights) << endl;
   }*/
   HgHypothesis bestHypo;
-  vector<FeatureStatsType> bleuStats(9);
+  vector<FeatureStatsType> bleuStats;
+  for (size_t i = 0; i < 4; ++i) {
+    bleuStats.push_back(4-i);
+    bleuStats.push_back(4-i);
+  }
+  bleuStats.push_back(4);
+
   Viterbi(graph,weights,bleuWeight,referenceSet,5,bleuStats,&bestHypo);
   for (size_t i = 0; i < bestHypo.text.size(); ++i) {
     cerr << bestHypo.text[i]->first << " ";

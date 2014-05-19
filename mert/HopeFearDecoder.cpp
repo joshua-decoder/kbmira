@@ -241,19 +241,31 @@ void HypergraphHopeFearDecoder::HopeFear(
 
     fearStats[i] = fearHypo.bleuStats[i];
   }
-  cerr << "hope bleu";
-  for (size_t i = 0; i < fearStats.size(); ++i) {
-    cerr << " " << hopeHypo.bleuStats[i];
+  cerr << "hope" << endl;;
+  for (size_t i = 0; i < hopeHypo.text.size(); ++i) {
+    cerr << hopeHypo.text[i]->first << " ";
   }
   cerr << endl;
-  cerr << "fear bleu";
   for (size_t i = 0; i < fearStats.size(); ++i) {
-    cerr << " " << fearHypo.bleuStats[i];
+    cerr << hopeHypo.bleuStats[i] << " ";
   }
   cerr << endl;
-  cerr << "model bleu";
+  cerr << "fear";
+  for (size_t i = 0; i < fearHypo.text.size(); ++i) {
+    cerr << fearHypo.text[i]->first << " ";
+  }
+  cerr << endl;
   for (size_t i = 0; i < fearStats.size(); ++i) {
-    cerr << " " << modelHypo.bleuStats[i];
+    cerr  << fearHypo.bleuStats[i] << " ";
+  }
+  cerr << endl;
+  cerr << "model";
+  for (size_t i = 0; i < modelHypo.text.size(); ++i) {
+    cerr << modelHypo.text[i]->first << " ";
+  }
+  cerr << endl;
+  for (size_t i = 0; i < fearStats.size(); ++i) {
+    cerr << modelHypo.bleuStats[i] << " ";
   }
   cerr << endl;
   hopeFear->hopeBleu = sentenceLevelBackgroundBleu(hopeFear->hopeStats, backgroundBleu);

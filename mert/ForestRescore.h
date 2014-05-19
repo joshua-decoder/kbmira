@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include <boost/unordered_set.hpp>
 
+#include "BleuScorer.h"
 #include "Hypergraph.h"
 
 namespace MosesTuning {
@@ -51,7 +52,7 @@ struct NgramEquals : public std::binary_function<const WordVec&, const WordVec&,
   }
 };
 
-typedef boost::unordered_multiset<WordVec, NgramHash, NgramEquals> NgramCounter;
+typedef boost::unordered_map<WordVec, size_t, NgramHash, NgramEquals> NgramCounter;
 
 
 class ReferenceSet {
