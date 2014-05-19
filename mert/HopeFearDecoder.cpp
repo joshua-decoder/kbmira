@@ -272,11 +272,13 @@ void HypergraphHopeFearDecoder::HopeFear(
   hopeFear->fearBleu = sentenceLevelBackgroundBleu(fearStats, backgroundBleu);
 
   //If fv and bleu stats are equal, then assume equal
-  hopeFear->hopeFearEqual = true;
-  for (size_t i = 0; i < fearStats.size(); ++i) {
-    if (fearStats[i] != hopeFear->hopeStats[i]) {
-       hopeFear->hopeFearEqual = false;
-       break;
+  hopeFear->hopeFearEqual = true; //(hopeFear->hopeBleu - hopeFear->fearBleu) >= 1e-8;
+  if (hopeFear->hopeFearEqual) {
+    for (size_t i = 0; i < fearStats.size(); ++i) {
+      if (fearStats[i] != hopeFear->hopeStats[i]) {
+         hopeFear->hopeFearEqual = false;
+         break;
+      }
     }
   }
   hopeFear->hopeFearEqual = hopeFear->hopeFearEqual && (hopeFear->fearFeatures == hopeFear->hopeFeatures);

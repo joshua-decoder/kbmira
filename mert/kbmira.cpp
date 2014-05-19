@@ -241,11 +241,11 @@ int main(int argc, char** argv)
       decoder->HopeFear(bg,wv,&hfd);
     
       // Update weights
-      if (!hfd.hopeFearEqual) { 
+      if (!hfd.hopeFearEqual && hfd.hopeBleu  > hfd.fearBleu) { 
         // Vector difference
         MiraFeatureVector diff = hfd.hopeFeatures - hfd.fearFeatures;
         // Bleu difference
-        assert(hfd.hopeBleu + 1e-8 >= hfd.fearBleu);
+        //assert(hfd.hopeBleu + 1e-8 >= hfd.fearBleu);
         ValType delta = hfd.hopeBleu - hfd.fearBleu;
         // Loss and update
         ValType diff_score = wv.score(diff);
