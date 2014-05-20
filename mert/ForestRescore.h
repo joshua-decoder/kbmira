@@ -59,6 +59,8 @@ class ReferenceSet {
 
 
 public:
+  
+  void AddLine(size_t sentenceId, const StringPiece& line, Vocab& vocab);
 
   void Load(const std::vector<std::string>& files, Vocab& vocab);
 

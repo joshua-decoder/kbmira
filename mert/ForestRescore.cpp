@@ -43,6 +43,7 @@ std::ostream& operator<<(std::ostream& out, const WordVec& wordVec) {
   return out;
 }
 
+
 void ReferenceSet::Load(const vector<string>& files, Vocab& vocab) {
   for (size_t i = 0; i < files.size(); ++i) {
     util::FilePiece fh(files[i].c_str());
@@ -54,48 +55,53 @@ void ReferenceSet::Load(const vector<string>& files, Vocab& vocab) {
       } catch (util::EndOfFileException &e) {
         break;
       }
-      //cerr << line << endl;
-      NgramCounter ngramCounts;
-      list<WordVec> openNgrams;
-      size_t length = 0;
-      //tokenize & count
-      for (util::TokenIter<util::SingleCharacter, true> j(line, util::SingleCharacter(' ')); j; ++j) {
-        const Vocab::Entry* nextTok = &(vocab.FindOrAdd(*j));
-        ++length;
-        openNgrams.push_front(WordVec());
-        for (list<WordVec>::iterator k = openNgrams.begin(); k != openNgrams.end();  ++k) {
-          k->push_back(nextTok);
-          ++ngramCounts[*k]; 
-        }
-        if (openNgrams.size() >=  kBleuNgramOrder) openNgrams.pop_back();
-      }
-
-      //merge into overall ngram map
-      for (NgramCounter::const_iterator ni = ngramCounts.begin();
-        ni != ngramCounts.end(); ++ni) {
-        size_t count = ni->second;
-        //cerr << *ni << " " << count <<  endl;
-        if (ngramCounts_.size() <= sentenceId) ngramCounts_.resize(sentenceId+1);
-        NgramMap::iterator totalsIter = ngramCounts_[sentenceId].find(ni->first);
-        if (totalsIter == ngramCounts_[sentenceId].end()) {
-          ngramCounts_[sentenceId][ni->first] = pair<size_t,size_t>(count,count);
-        } else {
-          ngramCounts_[sentenceId][ni->first].first = max(count, ngramCounts_[sentenceId][ni->first].first); //clip
-          ngramCounts_[sentenceId][ni->first].second += count; //no clip
-        }
-      }
-      //length
-      if (lengths_.size() <= sentenceId) lengths_.resize(sentenceId+1);
-      //TODO - length strategy - this is MIN
-      if (!lengths_[sentenceId]) {
-        lengths_[sentenceId] = length;
-      } else {
-        lengths_[sentenceId] = min(length,lengths_[sentenceId]);
-      }
-      //cerr << endl;
-      ++sentenceId;
+     AddLine(sentenceId, line, vocab);
+     ++sentenceId;
     }
   }
+
+}
+
+void ReferenceSet::AddLine(size_t sentenceId, const StringPiece& line, Vocab& vocab) {
+  //cerr << line << endl;
+  NgramCounter ngramCounts;
+  list<WordVec> openNgrams;
+  size_t length = 0;
+  //tokenize & count
+  for (util::TokenIter<util::SingleCharacter, true> j(line, util::SingleCharacter(' ')); j; ++j) {
+    const Vocab::Entry* nextTok = &(vocab.FindOrAdd(*j));
+    ++length;
+    openNgrams.push_front(WordVec());
+    for (list<WordVec>::iterator k = openNgrams.begin(); k != openNgrams.end();  ++k) {
+      k->push_back(nextTok);
+      ++ngramCounts[*k]; 
+    }
+    if (openNgrams.size() >=  kBleuNgramOrder) openNgrams.pop_back();
+  }
+
+  //merge into overall ngram map
+  for (NgramCounter::const_iterator ni = ngramCounts.begin();
+    ni != ngramCounts.end(); ++ni) {
+    size_t count = ni->second;
+    //cerr << *ni << " " << count <<  endl;
+    if (ngramCounts_.size() <= sentenceId) ngramCounts_.resize(sentenceId+1);
+    NgramMap::iterator totalsIter = ngramCounts_[sentenceId].find(ni->first);
+    if (totalsIter == ngramCounts_[sentenceId].end()) {
+      ngramCounts_[sentenceId][ni->first] = pair<size_t,size_t>(count,count);
+    } else {
+      ngramCounts_[sentenceId][ni->first].first = max(count, ngramCounts_[sentenceId][ni->first].first); //clip
+      ngramCounts_[sentenceId][ni->first].second += count; //no clip
+    }
+  }
+  //length
+  if (lengths_.size() <= sentenceId) lengths_.resize(sentenceId+1);
+  //TODO - length strategy - this is MIN
+  if (!lengths_[sentenceId]) {
+    lengths_[sentenceId] = length;
+  } else {
+    lengths_[sentenceId] = min(length,lengths_[sentenceId]);
+  }
+  //cerr << endl;
 
 }
   
@@ -377,6 +383,7 @@ void Viterbi(const Graph& graph, const SparseVector& weights, float bleuWeight, 
         FeatureStatsType totalScore = incomingScore;
         if (bleuWeight) { 
           FeatureStatsType bleuScore = bleuScorer.Score(*(incoming[ei]), vertex, bleuStats);
+          UTIL_THROW_IF(isnan(bleuScore), util::Exception, "Bleu score undefined, smoothing problem?");
           totalScore += bleuWeight * bleuScore;
         //  cerr << bleuScore << " Total: " << incomingScore << endl << endl;
           //cerr << "is " << incomingScore << " bs " << bleuScore << endl;

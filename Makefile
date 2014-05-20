@@ -1,7 +1,10 @@
 CC=g++
 CFLAGS=-I.
 
-all: kbmira extractor evaluator hgmira forest_rescore_test
+all: kbmira extractor evaluator hgmira forest_rescore_test tests
+
+tests:
+	./forest_rescore_test
 
 extractor: mertlib
 	$(CC) -o extractor -Wl,--start-group mert/extractor.o libmert_lib.a -Wl,-Bstatic -lm -lbz2 -lboost_thread-mt -lboost_system-mt  -lboost_filesystem-mt -Wl,-Bdynamic -ldl -lSegFault -lz -lrt -Wl,--end-group -pthread
