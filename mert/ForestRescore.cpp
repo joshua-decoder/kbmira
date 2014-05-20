@@ -205,6 +205,14 @@ FeatureStatsType HgBleuScorer::Score(const Edge& edge, const Vertex& head, vecto
   //This edge
   //cerr << "edge ngrams" << endl;
   UpdateMatches(ngramCounts, bleuStats);
+
+  //Child vertexes
+  for (size_t i = 0; i < edge.Children().size(); ++i) {
+    //cerr << "vertex ngrams " << edge.Children()[i] << endl;
+    for (size_t j = 0; j < bleuStats.size(); ++j) {
+      bleuStats[j] += vertexStates_[edge.Children()[i]].bleuStats[j];
+    }
+  }
   
 
   FeatureStatsType sourceLength = head.SourceCovered();
@@ -216,14 +224,6 @@ FeatureStatsType HgBleuScorer::Score(const Edge& edge, const Vertex& head, vecto
   //backgroundBleu_[backgroundBleu_.size()-1] = 
   //  backgroundRefLength_ * sourceLength / totalSourceLength_;
   FeatureStatsType bleu = sentenceLevelBackgroundBleu(bleuStats, backgroundBleu_);
-
-  //Child vertexes
-  for (size_t i = 0; i < edge.Children().size(); ++i) {
-    //cerr << "vertex ngrams " << edge.Children()[i] << endl;
-    for (size_t j = 0; j < bleuStats.size(); ++j) {
-      bleuStats[j] += vertexStates_[edge.Children()[i]].bleuStats[j];
-    }
-  }
 
   //TODO: Add background - for now just do 0.01 smoothing
   /*
@@ -355,13 +355,13 @@ void Viterbi(const Graph& graph, const SparseVector& weights, float bleuWeight, 
   vector<FeatureStatsType> winnerStats(kBleuNgramOrder*2+1);
   for (size_t vi = 0; vi < graph.VertexSize(); ++vi) {
     //cerr << "vertex id " << vi <<  endl;
+    FeatureStatsType winnerScore = kMinScore;
     const Vertex& vertex = graph.GetVertex(vi);
     const vector<const Edge*>& incoming = vertex.GetIncoming();
     if (!incoming.size()) {
       backPointers[vi].second = 0;  
     } else {
       //cerr << "\nVertex: " << vi << endl;
-      //size_t nonbleuid = 0; float nonbleuscore = kMinScore; size_t bleuid = 0;
       for (size_t ei = 0; ei < incoming.size(); ++ei) {
         //cerr << "edge id " << ei << endl;
         FeatureStatsType incomingScore = incoming[ei]->GetScore(weights);
@@ -374,53 +374,26 @@ void Viterbi(const Graph& graph, const SparseVector& weights, float bleuWeight, 
         vector<FeatureStatsType> bleuStats(kBleuNgramOrder*2+1);
        // cerr << "Score: " << incomingScore << " Bleu: ";
        // if (incomingScore > nonbleuscore) {nonbleuscore = incomingScore; nonbleuid = ei;}
+        FeatureStatsType totalScore = incomingScore;
         if (bleuWeight) { 
           FeatureStatsType bleuScore = bleuScorer.Score(*(incoming[ei]), vertex, bleuStats);
-          incomingScore += bleuWeight * bleuScore;
+          totalScore += bleuWeight * bleuScore;
         //  cerr << bleuScore << " Total: " << incomingScore << endl << endl;
           //cerr << "is " << incomingScore << " bs " << bleuScore << endl;
         }
-        if (incomingScore >= backPointers[vi].second) {
+        if (totalScore >= winnerScore) {
+          //We only store the feature score (not the bleu score) with the vertex,
+          //since the bleu score is always cumulative, ie from counts for the whole span.
+          winnerScore = totalScore;
           backPointers[vi].first = incoming[ei];
           backPointers[vi].second = incomingScore;
           winnerStats = bleuStats;
-       //   bleuid = ei;
         }
       }
-      /*
-      cerr << "Bleu winner: " << bleuid << "=" << backPointers[vi].second << 
-        " Non-bleu winner: " << nonbleuid << "=" << nonbleuscore << endl;
-      if (bleuid != nonbleuid) cerr << "DIFF" << endl;
-      */
       //update with winner
       //if (bleuWeight) {
-        bleuScorer.UpdateState(*(backPointers[vi].first), vi, winnerStats);
-
-        //debug
-        /*
-        HgHypothesis newBest;
-        GetBestHypothesis(vi, graph, backPointers,&newBest);
-        cerr << "Best for " << vi << endl;
-        cerr << newBest.text << endl;
-        newBest.featureVector.write(cerr);
-        cerr << endl;
-        cerr << "score " << inner_product(weights, newBest.featureVector) << endl;
-        */
-      //}
-          //debug
-          /*
-          cerr << "Setting backpointer " << vi <<  endl;
-          HgHypothesis newBest;
-          GetBestHypothesis(vi, graph, backPointers,&newBest);
-          for (size_t i = 0; i < newBest.text.size(); ++i) {
-            cerr << newBest.text[i]->first << " ";
-          }
-          cerr << endl;
-          for (size_t i = 0; i < winnerStats.size(); ++i) {
-            cerr << winnerStats[i] << " ";
-          }
-          cerr << endl;
-          */
+      //TODO: Not sure if we need this when computing max-model solution
+      bleuScorer.UpdateState(*(backPointers[vi].first), vi, winnerStats);
 
     }
   }
