@@ -199,6 +199,7 @@ FeatureStatsType HgBleuScorer::Score(const Edge& edge, const Vertex& head, vecto
     assert(currentWord);
     if (graph_.IsBoundary(currentWord)) continue;
     openNgrams.push_front(WordVec());
+    openNgrams.front().reserve(kBleuNgramOrder);
     for (list<WordVec>::iterator k = openNgrams.begin(); k != openNgrams.end();  ++k) {
       k->push_back(currentWord);
       //Only insert ngrams that cross boundaries
@@ -231,34 +232,6 @@ FeatureStatsType HgBleuScorer::Score(const Edge& edge, const Vertex& head, vecto
   //  backgroundRefLength_ * sourceLength / totalSourceLength_;
   FeatureStatsType bleu = sentenceLevelBackgroundBleu(bleuStats, backgroundBleu_);
 
-  //TODO: Add background - for now just do 0.01 smoothing
-  /*
-  FeatureStatsType logbleu = 0.0;
-  static FeatureStatsType kSmooth = 0.01;
-  for (size_t i = 0; i < bleuStats.size(); i+=2) {
-    //cerr << "match: " << bleuStats[i] << " total: " << bleuStats[i+1] << " ";
-    logbleu += log(bleuStats[i] + kSmooth);
-    logbleu -= log(bleuStats[i+1] + kSmooth);
-  }
-  //cerr << endl;
-
-  logbleu /= kBleuNgramOrder;
-
-  //brevity
-  FeatureStatsType sourceLength = head.SourceCovered();
-  size_t referenceLength = references_.Length(sentenceId_);
-  FeatureStatsType effectiveReferenceLength = 
-    sourceLength / totalSourceLength_ * referenceLength;
-  FeatureStatsType targetLength = GetTargetLength(edge);
-  FeatureStatsType bp = effectiveReferenceLength / targetLength;
-  //cerr << "bleu before bp " << exp(logbleu) << endl;
-  if (bp > 1) {
-    logbleu += 1-bp;
-  }
-  //cerr << "bleu after bp " << exp(logbleu) << endl;
-
-  FeatureStatsType bleu = exp(logbleu);
-  */
   return bleu;
 }
 

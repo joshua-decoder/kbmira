@@ -14,6 +14,7 @@
 
 #include <boost/functional/hash.hpp>
 
+
 #include "Util.h"
 
 using namespace std;
@@ -177,11 +178,17 @@ bool operator==(SparseVector const& item1, SparseVector const& item2)
   return item1.m_fvector==item2.m_fvector;
 }
 
+
 std::size_t hash_value(SparseVector const& item)
 {
-  boost::hash<SparseVector::fvector_t> hasher;
-  return hasher(item.m_fvector);
+  size_t seed = 0;
+  for (SparseVector::fvector_t::const_iterator i = item.m_fvector.begin(); i != item.m_fvector.end(); ++i) {
+    seed = util::MurmurHashNative(&(i->first), sizeof(i->first), seed);
+    seed = util::MurmurHashNative(&(i->second), sizeof(i->second), seed);
+  }
+  return seed;
 }
+
 
 FeatureStats::FeatureStats()
   : m_available_size(kAvailableSize), m_entries(0),

@@ -14,6 +14,9 @@
 #include <map>
 #include <string>
 #include <vector>
+
+#include <boost/unordered_map.hpp>
+
 #include "Types.h"
 
 namespace MosesTuning

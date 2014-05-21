@@ -34,8 +34,8 @@ std::ostream& operator<<(std::ostream& out, const WordVec& wordVec);
 struct NgramHash : public std::unary_function<const WordVec&, std::size_t> {
   std::size_t operator()(const WordVec& ngram) const {
     size_t seed = 0;
-    for (size_t i = 0; i < ngram.size(); ++i) {
-      seed = util::MurmurHashNative(&(ngram[i]->second), sizeof(ngram[i]->second), seed);
+    for (WordVec::const_iterator i = ngram.begin(); i != ngram.end(); ++i) {
+      seed = util::MurmurHashNative(&((*i)->second), sizeof((*i)->second), seed);
     }
     return seed;
   }
