@@ -40,6 +40,7 @@ namespace MosesTuning {
 
 typedef unsigned int WordIndex;
 const WordIndex kMaxWordIndex = UINT_MAX;
+static const FeatureStatsType kMinScore = -std::numeric_limits<FeatureStatsType>::max();
 
 template <class T> class FixedAllocator : boost::noncopyable {
   public:
@@ -144,6 +145,10 @@ class Edge {
       return features_;
     }
 
+    void SetFeatures(const SparseVector& features) {
+      features_ = features;
+    }
+
     const std::vector<size_t>& Children() const {
       return children_;
     }
@@ -207,7 +212,13 @@ class Graph : boost::noncopyable {
       return edges_[index];
     }
 
+    /* Created a pruned copy of this graph with minEdgeCount edges. Uses
+    the scores in the max-product semiring to rank edges, as suggested by
+    Colin Cherry */
+    void Prune(Graph* newGraph, const SparseVector& weights, size_t minEdgeCount) const;
+
     std::size_t VertexSize() const { return vertices_.Size(); }
+    std::size_t EdgeSize() const { return edges_.Size(); }
 
     bool IsBoundary(const Vocab::Entry* word) const {
       return word->second == vocab_.Bos().second || word->second == vocab_.Eos().second;

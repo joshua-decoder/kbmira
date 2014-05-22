@@ -17,6 +17,7 @@ License along with this library; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 ***********************************************************************/
 #include <iostream>
+#include <set>
 
 #include <boost/lexical_cast.hpp>
 
@@ -100,6 +101,151 @@ static pair<Edge*,size_t> ReadEdge(util::FilePiece &from, Graph &graph) {
   ++pipes;
   size_t sourceCovered = boost::lexical_cast<size_t>(*pipes);
   return pair<Edge*,size_t>(edge,sourceCovered); 
+}
+
+void Graph::Prune(Graph* pNewGraph, const SparseVector& weights, size_t minEdgeCount) const {
+
+  Graph& newGraph = *pNewGraph;
+
+  //For debug
+  map<const Edge*, string> edgeIds;
+  for (size_t i = 0; i < edges_.Size(); ++i) {
+    stringstream str;
+    for (size_t j = 0; j < edges_[i].Words().size(); ++j) {
+      if (edges_[i].Words()[j]) str << edges_[i].Words()[j]->first;
+    }
+    edgeIds[&(edges_[i])] = str.str();
+  }
+
+  //end For debug
+
+  map<const Edge*, FeatureStatsType> edgeBackwardScores;
+  map<const Edge*, size_t> edgeHeads;
+  vector<FeatureStatsType> vertexBackwardScores(vertices_.Size(), kMinScore);
+  vector<vector<const Edge*> > outgoing(vertices_.Size());
+
+  //Compute backward scores
+  for (size_t vi = 0; vi < vertices_.Size(); ++vi) {
+    cerr << "Vertex " << vi << endl;
+    const Vertex& vertex = vertices_[vi];
+    const vector<const Edge*>& incoming = vertex.GetIncoming();
+    if (!incoming.size()) {
+      vertexBackwardScores[vi] = 0;
+    } else {
+      for (size_t ei = 0; ei < incoming.size(); ++ei) {
+        cerr << "Edge " << edgeIds[incoming[ei]] << endl;
+        edgeHeads[incoming[ei]]= vi;
+        FeatureStatsType incomingScore = incoming[ei]->GetScore(weights);
+        for (size_t i = 0; i < incoming[ei]->Children().size(); ++i) {
+          cerr << "\tChild " << incoming[ei]->Children()[i] << endl;
+          size_t childId = incoming[ei]->Children()[i];
+          UTIL_THROW_IF(vertexBackwardScores[childId] == kMinScore,
+            HypergraphException, "Graph was not topologically sorted. curr=" << vi << " prev=" << childId);
+          outgoing[childId].push_back(incoming[ei]);
+          incomingScore += vertexBackwardScores[childId];
+        }
+        edgeBackwardScores[incoming[ei]]= incomingScore;
+        cerr << "Backward score: " << incomingScore << endl;
+        if (incomingScore > vertexBackwardScores[vi]) vertexBackwardScores[vi] = incomingScore;
+      }
+    }
+  }
+
+  //Compute forward scores
+  vector<FeatureStatsType> vertexForwardScores(vertices_.Size(), kMinScore);
+  map<const Edge*, FeatureStatsType> edgeForwardScores;
+  for (size_t i = 1; i <= vertices_.Size(); ++i) {
+    size_t vi = vertices_.Size() - i;
+    cerr << "Vertex " << vi << endl;
+    if (!outgoing[vi].size()) {
+      vertexForwardScores[vi] = 0;
+    } else {
+      for (size_t ei = 0; ei < outgoing[vi].size(); ++ei) {
+        cerr << "Edge " << edgeIds[outgoing[vi][ei]] << endl;
+        FeatureStatsType outgoingScore = 0; 
+        //sum scores of siblings
+        for (size_t i = 0; i < outgoing[vi][ei]->Children().size(); ++i) {
+          size_t siblingId = outgoing[vi][ei]->Children()[i];
+          if (siblingId != vi) {
+            cerr << "\tSibling " << siblingId << endl;
+            outgoingScore += vertexBackwardScores[siblingId];
+          }
+        }
+        //add score of head
+        outgoingScore += vertexForwardScores[edgeHeads[outgoing[vi][ei]]];
+        cerr << "Forward score " << outgoingScore << endl;
+        edgeForwardScores[outgoing[vi][ei]] = outgoingScore;
+        outgoingScore += outgoing[vi][ei]->GetScore(weights);
+        if (outgoingScore > vertexForwardScores[vi]) vertexForwardScores[vi] = outgoingScore;
+      }
+    }
+  }
+
+
+
+  multimap<FeatureStatsType, const Edge*> edgeScores;
+  for (size_t i = 0; i < edges_.Size(); ++i) {
+    const Edge* edge = &(edges_[i]);
+    if (edgeForwardScores.find(edge) == edgeForwardScores.end()) {
+      //This edge has no children, so didn't get a forward score. Its forward score
+      //is that of its head
+      edgeForwardScores[edge] = vertexForwardScores[edgeHeads[edge]];
+    }
+    FeatureStatsType score = edgeForwardScores[edge] + edgeBackwardScores[edge];
+    edgeScores.insert(pair<FeatureStatsType, const Edge*>(score,edge));
+    cerr << edgeIds[edge] << " " << score << endl;
+  }
+
+
+  
+  multimap<FeatureStatsType, const Edge*>::const_reverse_iterator ei = edgeScores.rbegin();
+  size_t edgeCount = 1;
+  while(edgeCount < minEdgeCount && ei != edgeScores.rend()) {
+    ++ei;
+    ++edgeCount;
+  }
+  multimap<FeatureStatsType, const Edge*>::const_iterator lowest = edgeScores.lower_bound(ei->first);
+
+  cerr << "Retained edges" << endl;
+  set<size_t> retainedVertices;
+  set<const Edge*> retainedEdges;
+  for (; lowest != edgeScores.end(); ++lowest) {
+    cerr << lowest->first << " " << edgeIds[lowest->second] << endl;
+    retainedEdges.insert(lowest->second);
+    retainedVertices.insert(edgeHeads[lowest->second]);
+    for (size_t i = 0; i < lowest->second->Children().size(); ++i) {
+      retainedVertices.insert(lowest->second->Children()[i]);
+    }
+  }
+  newGraph.SetCounts(retainedVertices.size(), retainedEdges.size());
+
+  cerr << "Retained vertices" << endl;
+  map<size_t,size_t> oldIdToNew;
+  size_t vi = 0;
+  for (set<size_t>::const_iterator i = retainedVertices.begin(); i != retainedVertices.end(); ++i, ++vi) {
+    cerr << *i << endl;
+    oldIdToNew[*i] = vi;
+    Vertex* vertex = newGraph.NewVertex();
+    vertex->SetSourceCovered(vertices_[*i].SourceCovered()); 
+  }
+
+  for (set<const Edge*>::const_iterator i = retainedEdges.begin(); i != retainedEdges.end(); ++i) {
+    Edge* newEdge = newGraph.NewEdge();
+    const Edge* oldEdge = *i;
+    for (size_t j = 0; j < oldEdge->Words().size(); ++j) {
+      newEdge->AddWord(oldEdge->Words()[j]);
+    }
+    for (size_t j = 0; j < oldEdge->Children().size(); ++j) {
+      newEdge->AddChild(oldIdToNew[oldEdge->Children()[j]]);
+    }
+    newEdge->SetFeatures(oldEdge->Features());
+    Vertex& newHead = newGraph.vertices_[oldIdToNew[edgeHeads[oldEdge]]];
+    newHead.AddEdge(newEdge);
+  }
+
+  
+
+
 }
 
 /**

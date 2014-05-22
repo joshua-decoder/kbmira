@@ -299,7 +299,6 @@ void HgBleuScorer::UpdateState(const Edge& winnerEdge, size_t vertexId, const ve
 }
 
 
-static const FeatureStatsType kMinScore = -numeric_limits<FeatureStatsType>::max();
 typedef pair<const Edge*,FeatureStatsType> BackPointer;
 
 

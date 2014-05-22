@@ -186,7 +186,7 @@ BOOST_AUTO_TEST_CASE(viterbi_3branch_lattice)
   v4->SetSourceCovered(6);
 
   /*Paths     || foo || bar || s(2,1)
-   ab cd hk   || 1   ||  5  || 9
+   ab cd hk   || 1   ||  5  || 7
    hi cd hk   || 2   ||  2  || 6
    ab jk      || 3   ||  4  || 10
    hi jk      || 4   ||  1  || 9
