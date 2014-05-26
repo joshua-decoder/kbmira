@@ -106,10 +106,12 @@ static pair<Edge*,size_t> ReadEdge(util::FilePiece &from, Graph &graph) {
 void Graph::Prune(Graph* pNewGraph, const SparseVector& weights, size_t minEdgeCount) const {
 
   Graph& newGraph = *pNewGraph;
+  //TODO: Optimise case where no pruning required
 
   //For debug
+  
   /*
-  map<1const Edge*, string> edgeIds;
+  map<const Edge*, string> edgeIds;
   for (size_t i = 0; i < edges_.Size(); ++i) {
     stringstream str;
     for (size_t j = 0; j < edges_[i].Words().size(); ++j) {
@@ -194,7 +196,7 @@ void Graph::Prune(Graph* pNewGraph, const SparseVector& weights, size_t minEdgeC
     }
     FeatureStatsType score = edgeForwardScores[edge] + edgeBackwardScores[edge];
     edgeScores.insert(pair<FeatureStatsType, const Edge*>(score,edge));
-    //cerr << edgeIds[edge] << " " << score << endl;
+  //  cerr << edgeIds[edge] << " " << score << endl;
   }
 
 
@@ -205,7 +207,8 @@ void Graph::Prune(Graph* pNewGraph, const SparseVector& weights, size_t minEdgeC
     ++ei;
     ++edgeCount;
   }
-  multimap<FeatureStatsType, const Edge*>::const_iterator lowest = edgeScores.lower_bound(ei->first);
+  multimap<FeatureStatsType, const Edge*>::const_iterator lowest = edgeScores.begin();
+  if (ei != edgeScores.rend())  lowest = edgeScores.lower_bound(ei->first);
 
   //cerr << "Retained edges" << endl;
   set<size_t> retainedVertices;

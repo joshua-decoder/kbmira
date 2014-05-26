@@ -175,14 +175,17 @@ HypergraphHopeFearDecoder::HypergraphHopeFearDecoder
     Graph graph(vocab_);
     size_t id = boost::lexical_cast<size_t>(di->path().stem().string());
     util::FilePiece file(di->path().string().c_str());
+    if (id != 222) continue;
     cerr << "Reading hg" << id << endl;
     ReadGraph(file,graph);
 
+    //cerr << "ref length " << references_.Length(id) << endl;
     size_t edgeCount = hg_pruning * references_.Length(id);
     boost::shared_ptr<Graph> prunedGraph;
     prunedGraph.reset(new Graph(vocab_));
     graph.Prune(prunedGraph.get(), weights, edgeCount);
     graphs_[id] = prunedGraph;
+    //cerr << "Pruning to v=" << graphs_[id]->VertexSize() << " e=" << graphs_[id]->EdgeSize()  << endl;
   }
 
 
