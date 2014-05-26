@@ -175,7 +175,6 @@ HypergraphHopeFearDecoder::HypergraphHopeFearDecoder
     Graph graph(vocab_);
     size_t id = boost::lexical_cast<size_t>(di->path().stem().string());
     util::FilePiece file(di->path().string().c_str());
-    if (id != 222) continue;
     cerr << "Reading hg" << id << endl;
     ReadGraph(file,graph);
 
