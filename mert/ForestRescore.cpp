@@ -112,7 +112,7 @@ size_t ReferenceSet::NgramMatches(size_t sentenceId, const WordVec& ngram, bool 
   return clip ? ngi->second.first : ngi->second.second;
 }
 
-VertexState::VertexState(): bleuStats(kBleuNgramOrder) {}
+VertexState::VertexState(): bleuStats(kBleuNgramOrder), targetLength(0) {}
 
 void HgBleuScorer::UpdateMatches(const NgramCounter& counts, vector<FeatureStatsType>& bleuStats ) const {
   for (NgramCounter::const_iterator ngi = counts.begin(); ngi != counts.end(); ++ngi) {
@@ -157,9 +157,16 @@ FeatureStatsType HgBleuScorer::Score(const Edge& edge, const Vertex& head, vecto
         assert(!vertexState);
         vertexState = &(vertexStates_[edge.Children()[childId]]);
         ++childId;
-        inLeftContext = true;
-        contextId = 0;
-        currentWord = vertexState->leftContext[contextId];
+        if (vertexState->leftContext.size()) {
+          inLeftContext = true;
+          contextId = 0;
+          currentWord = vertexState->leftContext[contextId];
+        } else {
+          //empty context
+          vertexState = NULL;
+          ++wordId;
+          continue;
+        }
       } else {
         //already in a vertex
         ++contextId;
@@ -238,6 +245,7 @@ FeatureStatsType HgBleuScorer::Score(const Edge& edge, const Vertex& head, vecto
 void HgBleuScorer::UpdateState(const Edge& winnerEdge, size_t vertexId, const vector<FeatureStatsType>& bleuStats) {
   //TODO: Maybe more efficient to absorb into the Score() method
   VertexState& vertexState = vertexStates_[vertexId];
+  //cerr << "Updating state for " << vertexId << endl;
   
   //leftContext
   int wi = 0;
@@ -308,6 +316,7 @@ typedef pair<const Edge*,FeatureStatsType> BackPointer;
 static void GetBestHypothesis(size_t vertexId, const Graph& graph, const vector<BackPointer>& bps,
      HgHypothesis* bestHypo) {
   //cerr << "Expanding " << vertexId << endl;
+  //UTIL_THROW_IF(bps[vertexId].second == kMinScore+1, HypergraphException, "Landed at vertex " << vertexId << " which is a dead end");
   if (!bps[vertexId].first) return;
   const Edge* prevEdge = bps[vertexId].first;
   bestHypo->featureVector += prevEdge->Features();
@@ -337,7 +346,10 @@ void Viterbi(const Graph& graph, const SparseVector& weights, float bleuWeight, 
     const Vertex& vertex = graph.GetVertex(vi);
     const vector<const Edge*>& incoming = vertex.GetIncoming();
     if (!incoming.size()) {
-      backPointers[vi].second = 0;  
+      //UTIL_THROW(HypergraphException, "Vertex " << vi << " has no incoming edges");
+      //If no incoming edges, vertex is a dead end
+      backPointers[vi].first = NULL;
+      backPointers[vi].second = kMinScore/2;  
     } else {
       //cerr << "\nVertex: " << vi << endl;
       for (size_t ei = 0; ei < incoming.size(); ++ei) {
