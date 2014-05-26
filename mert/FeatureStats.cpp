@@ -14,6 +14,7 @@
 
 #include <boost/functional/hash.hpp>
 
+#include "util/murmur_hash.hh"
 
 #include "Util.h"
 
