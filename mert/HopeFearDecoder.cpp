@@ -154,27 +154,37 @@ HypergraphHopeFearDecoder::HypergraphHopeFearDecoder
                             size_t num_dense,
                             bool streaming,
                             bool no_shuffle,
-                            bool safe_hope
+                            bool safe_hope,
+                            size_t hg_pruning,
+                            const MiraWeightVector& wv
                           ) :
                           num_dense_(num_dense) {
 
   UTIL_THROW_IF(streaming, util::Exception, "Streaming not currently supported for hypergraphs");
   UTIL_THROW_IF(!fs::exists(hypergraphDir), HypergraphException, "Directory '" << hypergraphDir << "' does not exist");
   UTIL_THROW_IF(!referenceFiles.size(), util::Exception, "No reference files supplied");
+  references_.Load(referenceFiles, vocab_);
+
+  SparseVector weights;
+  wv.ToSparse(&weights);
+
   static const string kWeights = "weights";
   fs::directory_iterator dend;
   for (fs::directory_iterator di(hypergraphDir); di != dend; ++di) {
-    boost::shared_ptr<Graph> graph;
-    graph.reset(new Graph(vocab_));
     if (di->path().filename() == kWeights) continue;
+    Graph graph(vocab_);
     size_t id = boost::lexical_cast<size_t>(di->path().stem().string());
     util::FilePiece file(di->path().string().c_str());
     cerr << "Reading hg" << id << endl;
-    ReadGraph(file,*graph);
-    graphs_[id] = graph;
+    ReadGraph(file,graph);
+
+    size_t edgeCount = hg_pruning * references_.Length(id);
+    boost::shared_ptr<Graph> prunedGraph;
+    prunedGraph.reset(new Graph(vocab_));
+    graph.Prune(prunedGraph.get(), weights, edgeCount);
+    graphs_[id] = prunedGraph;
   }
 
-  references_.Load(referenceFiles, vocab_);
 
 }
 

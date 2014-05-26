@@ -118,7 +118,9 @@ public:
                             size_t num_dense,
                             bool streaming,
                             bool no_shuffle,
-                            bool safe_hope
+                            bool safe_hope,
+                            size_t hg_pruning,
+                            const MiraWeightVector& wv
                             );
 
   virtual void reset();

@@ -40,7 +40,7 @@ namespace MosesTuning {
 
 typedef unsigned int WordIndex;
 const WordIndex kMaxWordIndex = UINT_MAX;
-static const FeatureStatsType kMinScore = -std::numeric_limits<FeatureStatsType>::max();
+const FeatureStatsType kMinScore = -std::numeric_limits<FeatureStatsType>::max();
 
 template <class T> class FixedAllocator : boost::noncopyable {
   public:

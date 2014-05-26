@@ -71,6 +71,7 @@ int main(int argc, char** argv)
   bool model_bg = false; // Use model for background corpus
   bool verbose = false; // Verbose updates
   bool safe_hope = false; // Model score cannot have more than BLEU_RATIO times more influence than BLEU
+  size_t hgPruning = 50; //prune hypergraphs to have this many edges per reference word 
 
   // Command-line processing follows pro.cpp
   po::options_description desc("Allowed options");
@@ -93,6 +94,7 @@ int main(int argc, char** argv)
   ("model-bg", po::value(&model_bg)->zero_tokens()->default_value(false), "Use model instead of hope for BLEU background")
   ("verbose", po::value(&verbose)->zero_tokens()->default_value(false), "Verbose updates")
   ("safe-hope", po::value(&safe_hope)->zero_tokens()->default_value(false), "Mode score's influence on hope decoding is limited")
+  ("hg-prune", po::value<size_t>(&hgPruning), "Prune hypergraphs to have this many edges per reference word")
   ;
 
   po::options_description cmdline_options;
@@ -169,9 +171,6 @@ int main(int argc, char** argv)
       } while(getline(opt,buffer));
 
 
-      for (size_t i = 0; i < names.size(); ++i) {
-             }
-
       //Make sure that SparseVector encodes dense feature names as 0..n-1.
       for (size_t i = 0; i < names.size(); ++i) {
         size_t id = SparseVector::encode(names[i]);
@@ -222,7 +221,7 @@ int main(int argc, char** argv)
   if (type == "nbest") {
     decoder.reset(new NbestHopeFearDecoder(featureFiles, scoreFiles, streaming, no_shuffle, safe_hope));
   } else if (type == "hypergraph") {
-    decoder.reset(new HypergraphHopeFearDecoder(hgDir, referenceFiles, initDenseSize, streaming, no_shuffle, safe_hope));
+    decoder.reset(new HypergraphHopeFearDecoder(hgDir, referenceFiles, initDenseSize, streaming, no_shuffle, safe_hope, hgPruning, wv));
   } else {
     UTIL_THROW(util::Exception, "Unknown batch mira type: '" << type << "'");
   }
