@@ -253,6 +253,7 @@ void HypergraphHopeFearDecoder::HopeFear(
 
     fearStats[i] = fearHypo.bleuStats[i];
   }
+  /*
   cerr << "hope" << endl;;
   for (size_t i = 0; i < hopeHypo.text.size(); ++i) {
     cerr << hopeHypo.text[i]->first << " ";
@@ -280,6 +281,7 @@ void HypergraphHopeFearDecoder::HopeFear(
     cerr << modelHypo.bleuStats[i] << " ";
   }
   cerr << endl;
+  */
   hopeFear->hopeBleu = sentenceLevelBackgroundBleu(hopeFear->hopeStats, backgroundBleu);
   hopeFear->fearBleu = sentenceLevelBackgroundBleu(fearStats, backgroundBleu);
 
