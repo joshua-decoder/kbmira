@@ -40,7 +40,7 @@ struct NgramHash : public std::unary_function<const WordVec&, std::size_t> {
 struct NgramEquals : public std::binary_function<const WordVec&, const WordVec&, bool> {
   bool operator()(const WordVec& first, const WordVec& second) const {
     if (first.size() != second.size()) return false;
-    return memcmp(&(first[0]), &(second[0]), first.size() * sizeof(WordVec::value_type));
+    return memcmp(&(first[0]), &(second[0]), first.size() * sizeof(WordVec::value_type)) == 0;
   }
 };
 
