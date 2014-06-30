@@ -170,12 +170,13 @@ HypergraphHopeFearDecoder::HypergraphHopeFearDecoder
 
   static const string kWeights = "weights";
   fs::directory_iterator dend;
+  size_t fileCount = 0;
+  cerr << "Reading hypergraphs" << endl;
   for (fs::directory_iterator di(hypergraphDir); di != dend; ++di) {
     if (di->path().filename() == kWeights) continue;
     Graph graph(vocab_);
     size_t id = boost::lexical_cast<size_t>(di->path().stem().string());
     util::FilePiece file(di->path().string().c_str());
-    cerr << "Reading hg" << id << endl;
     ReadGraph(file,graph);
 
     //cerr << "ref length " << references_.Length(id) << endl;
@@ -185,7 +186,11 @@ HypergraphHopeFearDecoder::HypergraphHopeFearDecoder
     graph.Prune(prunedGraph.get(), weights, edgeCount);
     graphs_[id] = prunedGraph;
     //cerr << "Pruning to v=" << graphs_[id]->VertexSize() << " e=" << graphs_[id]->EdgeSize()  << endl;
+    ++fileCount;
+    if (fileCount % 10 == 0) cerr << ".";
+    if (fileCount % 400 ==  0) cerr << " [count=" << fileCount << "]\n";
   }
+  cerr << endl << "Done" << endl;
 
 
 }

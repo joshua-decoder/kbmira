@@ -83,11 +83,13 @@ int main(int argc, char** argv)
   referenceSet.Load(references, graph.MutableVocab());
 
   
+  /*
   WordVec ngram;
-  ngram.push_back(&(graph.MutableVocab().FindOrAdd("the")));
-  cerr << referenceSet.NgramMatches(9,ngram,true) << endl;
-  ngram.push_back(&(graph.MutableVocab().FindOrAdd("1990")));
-  cerr << referenceSet.NgramMatches(9,ngram,true) << endl;
+  ngram.push_back(graph.MutableVocab().FindOrAdd("the").second);
+  //cerr << referenceSet.NgramMatches(9,ngram,true) << endl;
+  ngram.push_back(graph.MutableVocab().FindOrAdd("1990").second);
+  //cerr << referenceSet.NgramMatches(9,ngram,true) << endl;
+  */
   
   SparseVector weights;
   weights.load(weights_file);

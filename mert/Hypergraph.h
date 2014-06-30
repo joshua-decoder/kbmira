@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include <boost/noncopyable.hpp>
 #include <boost/scoped_array.hpp>
+#include <boost/shared_ptr.hpp>
 #include <boost/functional/hash/hash.hpp>
 #include <boost/unordered_map.hpp>
 
@@ -118,11 +119,16 @@ typedef std::vector<const Vocab::Entry*> WordVec;
 
 class Vertex;
 
+//Use shared pointer to save copying when we prune
+typedef boost::shared_ptr<SparseVector> FeaturePtr;
+
 /**
  * An edge has 1 head vertex, 0..n child (tail) vertices, a list of words and a feature vector.
 **/
 class Edge {
   public:
+    Edge() {features_.reset(new SparseVector());}
+
     void AddWord(const Vocab::Entry *word) {
       words_.push_back(word);
     }
@@ -133,7 +139,7 @@ class Edge {
 
     void AddFeature(const StringPiece& name, FeatureStatsType value) {
       //TODO StringPiece interface
-      features_.set(name.as_string(),value);
+      features_->set(name.as_string(),value);
     }
 
 
@@ -141,11 +147,11 @@ class Edge {
       return words_;
     }
     
-    const SparseVector& Features() const {
+    const FeaturePtr& Features() const {
       return features_;
     }
 
-    void SetFeatures(const SparseVector& features) {
+    void SetFeatures(const FeaturePtr& features) {
       features_ = features;
     }
 
@@ -154,14 +160,14 @@ class Edge {
     }
 
     FeatureStatsType GetScore(const SparseVector& weights) const {
-      return inner_product(features_, weights);
+      return inner_product(*(features_.get()), weights);
     }
 
   private:
     // NULL for non-terminals.  
     std::vector<const Vocab::Entry*> words_;
     std::vector<size_t> children_;
-    SparseVector features_;
+    boost::shared_ptr<SparseVector> features_;
 };
 
 /*

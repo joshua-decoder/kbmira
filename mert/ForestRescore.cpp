@@ -319,7 +319,7 @@ static void GetBestHypothesis(size_t vertexId, const Graph& graph, const vector<
   //UTIL_THROW_IF(bps[vertexId].second == kMinScore+1, HypergraphException, "Landed at vertex " << vertexId << " which is a dead end");
   if (!bps[vertexId].first) return;
   const Edge* prevEdge = bps[vertexId].first;
-  bestHypo->featureVector += prevEdge->Features();
+  bestHypo->featureVector += *(prevEdge->Features().get());
   size_t childId = 0;
   for (size_t i = 0; i < prevEdge->Words().size(); ++i) {
     if (prevEdge->Words()[i] != NULL) {
