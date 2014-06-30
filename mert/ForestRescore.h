@@ -33,22 +33,14 @@ std::ostream& operator<<(std::ostream& out, const WordVec& wordVec);
 
 struct NgramHash : public std::unary_function<const WordVec&, std::size_t> {
   std::size_t operator()(const WordVec& ngram) const {
-    size_t seed = 0;
-    for (WordVec::const_iterator i = ngram.begin(); i != ngram.end(); ++i) {
-      seed = util::MurmurHashNative(&((*i)->second), sizeof((*i)->second), seed);
-    }
-    return seed;
+    return util::MurmurHashNative(&(ngram[0]), ngram.size() * sizeof(WordVec::value_type));
   }
 };
 
 struct NgramEquals : public std::binary_function<const WordVec&, const WordVec&, bool> {
   bool operator()(const WordVec& first, const WordVec& second) const {
     if (first.size() != second.size()) return false;
-    for (size_t i = 0; i < first.size(); ++i) {
-      if (first[i]->second != second[i]->second) return false;
-    }
-    return true;
-
+    return memcmp(&(first[0]), &(second[0]), first.size() * sizeof(WordVec::value_type));
   }
 };
 
