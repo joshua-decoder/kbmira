@@ -204,10 +204,7 @@ FeatureStats::FeatureStats(const size_t size)
 
 FeatureStats::~FeatureStats()
 {
-  if (m_array) {
-    delete [] m_array;
-    m_array = NULL;
-  }
+   delete [] m_array;
 }
 
 void FeatureStats::Copy(const FeatureStats &stats)
